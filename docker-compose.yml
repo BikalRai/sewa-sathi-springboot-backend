@@ -1,0 +1,30 @@
+services:
+  backend:
+    build: .
+    ports:
+      - "8080:8080"                # expose backend port
+    volumes:
+      - .:/app                     # mount source code for hot reload
+      - ~/.m2:/root/.m2            # cache Maven dependencies
+    depends_on:
+      - db
+    env_file:
+      - .env
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/sewa_sathi   # points to PostgreSQL container
+      DB_USERNAME: ${DB_USERNAME}                     # from .env
+      DB_PASSWORD: ${DB_PASSWORD}                     # from .env
+
+  db:
+    image: postgres:17
+    ports:
+      - "5432:5432"                # optional, allows host connection
+    environment:
+      POSTGRES_DB: sewa_sathi
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data   # persist data
+
+volumes:
+  pgdata:

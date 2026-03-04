@@ -13,14 +13,20 @@ import raicod3.example.com.custom.CustomUserDetailsService;
 import raicod3.example.com.dto.user.AuthRegistrationRequestDto;
 import raicod3.example.com.dto.user.AuthRequestDto;
 import raicod3.example.com.dto.user.UserResponseDto;
+import raicod3.example.com.enums.UserRole;
+import raicod3.example.com.exception.BadRequestException;
+import raicod3.example.com.exception.ForbiddenException;
+import raicod3.example.com.exception.ResourceNotFoundException;
 import raicod3.example.com.jwt.JwtUtils;
+import raicod3.example.com.model.RefreshToken;
 import raicod3.example.com.model.User;
+import raicod3.example.com.repository.RefreshTokenRepository;
 import raicod3.example.com.repository.UserRepository;
 import raicod3.example.com.utilities.APIResponse;
+import raicod3.example.com.utilities.PasswordValidation;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.time.LocalDateTime;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -31,20 +37,49 @@ public class AuthService {
     private final CustomUserDetailsService customUserDetailsService;
     private final JwtUtils jwtUtils;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenRepository refreshTokenRepository;
 
-    public AuthService(UserRepository userRepository, AuthenticationManager authenticationManager, CustomUserDetailsService customUserDetailsService, JwtUtils jwtUtils, PasswordEncoder passwordEncoder) {
+
+    public AuthService(UserRepository userRepository, AuthenticationManager authenticationManager, CustomUserDetailsService customUserDetailsService, JwtUtils jwtUtils, PasswordEncoder passwordEncoder, RefreshTokenRepository refreshTokenRepository) {
         this.userRepository = userRepository;
         this.authenticationManager = authenticationManager;
         this.customUserDetailsService = customUserDetailsService;
         this.jwtUtils = jwtUtils;
         this.passwordEncoder = passwordEncoder;
+        this.refreshTokenRepository = refreshTokenRepository;
     }
 
     public APIResponse registerUser(AuthRegistrationRequestDto request) {
+
+
+        Optional<User> foundUser = userRepository.findUserByEmail(request.getEmail());
+
+        if(foundUser.isPresent()) {
+            throw  new BadRequestException("Email already registered.");
+        }
+
         User user = new User();
         user.setFullName(request.getFullName());
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
+
+        if(request.getRole() == null) {
+            throw  new BadRequestException("Role not supported.");
+        }
+
+        if(request.getRole() != null && request.getRole().equalsIgnoreCase("provider")) {
+            user.setRole(UserRole.PROVIDER);
+        } else {
+            user.setRole(UserRole.CUSTOMER);
+        }
+
+        user.setCreatedAt(LocalDateTime.now());
+
+        String passwordValidation = PasswordValidation.validatePassword(request.getPassword());
+
+        if(!"Strong".equalsIgnoreCase(passwordValidation)) {
+            throw new BadRequestException(passwordValidation);
+        }
 
         User savedUser = userRepository.save(user);
 
@@ -54,16 +89,30 @@ public class AuthService {
     }
 
     public APIResponse authenticate(AuthRequestDto request) {
-
-        authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
+        try {
+            authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
+        } catch (Exception e) {
+            log.error("Authentication failed: {}", e.getMessage());
+            throw new UsernameNotFoundException("Invalid credentials.");
+        }
         UserDetails userDetails = customUserDetailsService.loadUserByUsername(request.getEmail());
 
 
-        String accessToken = jwtUtils.generateToken(userDetails.getUsername());
+        User user = userRepository.findUserByEmail(request.getEmail()).orElseThrow(() -> new ForbiddenException("Account not found."));
 
-        Map<String, String> data = new HashMap<>();
+
+        String accessToken = jwtUtils.generateToken(userDetails.getUsername());
+        String refreshToken = jwtUtils.generateRefreshToken(userDetails.getUsername());
+
+        refreshTokenRepository.save(new RefreshToken(refreshToken));
+
+        Map<String, Object> data = new HashMap<>();
         data.put("access_token", accessToken);
+        data.put("refresh_token", refreshToken);
+        data.put("role", user.getRole());
+        data.put("userId", user.getId());
 
         return APIResponse.success(data, "Successfully authenticated user", HttpStatus.OK);
     }
+
 }
