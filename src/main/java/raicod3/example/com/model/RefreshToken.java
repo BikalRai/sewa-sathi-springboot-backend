@@ -1,14 +1,12 @@
 package raicod3.example.com.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -22,8 +20,15 @@ public class RefreshToken {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
     private String refreshToken;
+    private LocalDateTime expiresAt;
 
-    public RefreshToken(String refreshToken) {
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    private User user;
+
+    public RefreshToken(String refreshToken, LocalDateTime expiresAt, User user) {
         this.refreshToken = refreshToken;
+        this.expiresAt = expiresAt;
+        this.user = user;
     }
 }

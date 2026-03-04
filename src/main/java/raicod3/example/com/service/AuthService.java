@@ -1,8 +1,10 @@
 package raicod3.example.com.service;
 
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -88,7 +90,7 @@ public class AuthService {
         return APIResponse.success(userResponseDto, "Successfully registered user", HttpStatus.CREATED);
     }
 
-    public APIResponse authenticate(AuthRequestDto request) {
+    public APIResponse authenticate(AuthRequestDto request, HttpServletResponse response) {
         try {
             authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
         } catch (Exception e) {
@@ -103,12 +105,24 @@ public class AuthService {
 
         String accessToken = jwtUtils.generateToken(userDetails.getUsername());
         String refreshToken = jwtUtils.generateRefreshToken(userDetails.getUsername());
+        LocalDateTime expiry = LocalDateTime.now().plusDays(7);
 
-        refreshTokenRepository.save(new RefreshToken(refreshToken));
+        refreshTokenRepository.save(new RefreshToken(refreshToken, expiry, user));
+
+        ResponseCookie cookie = ResponseCookie.from("refreshToken", refreshToken)
+                .httpOnly(true)
+                .secure(false)
+//                .secure(true)
+                .path("/api/v1/auth/refresh")
+                .maxAge(7 * 24 * 60 * 60)
+                .sameSite("Lax")
+//                .sameSite("Strict")
+                .build();
+
+        response.setHeader("Set-Cookie", cookie.toString());
 
         Map<String, Object> data = new HashMap<>();
         data.put("access_token", accessToken);
-        data.put("refresh_token", refreshToken);
         data.put("role", user.getRole());
         data.put("userId", user.getId());
 
