@@ -5,7 +5,9 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import raicod3.example.com.enums.UserRole;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -20,7 +22,18 @@ public class User {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
     private String fullName;
+
+    @Column(unique = true, nullable = false)
     private String email;
     private String password;
+
+    @Enumerated(EnumType.STRING)
+    private UserRole role;
+    private boolean isActive;
+    private LocalDateTime createdAt;
+
+    private int failedLoginAttempts;
+    private boolean accountLocked;
+    private LocalDateTime lockedAt;
 
 }
