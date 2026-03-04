@@ -8,6 +8,7 @@ import lombok.Setter;
 import raicod3.example.com.enums.UserRole;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -35,5 +36,8 @@ public class User {
     private int failedLoginAttempts;
     private boolean accountLocked;
     private LocalDateTime lockedAt;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<RefreshToken> refreshTokens;
 
 }
