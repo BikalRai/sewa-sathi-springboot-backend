@@ -1,9 +1,9 @@
 package raicod3.example.com.service;
 
 import com.nimbusds.jose.shaded.gson.Gson;
+import jakarta.mail.MessagingException;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -11,7 +11,10 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import raicod3.example.com.constants.Http_Constants;
 import raicod3.example.com.custom.CustomUserDetailsService;
+import raicod3.example.com.dto.email.EmailRequest;
 import raicod3.example.com.dto.google.GoogleLoginRequestDto;
 import raicod3.example.com.dto.user.AuthRegistrationRequestDto;
 import raicod3.example.com.dto.user.AuthRequestDto;
@@ -21,11 +24,14 @@ import raicod3.example.com.enums.UserRole;
 import raicod3.example.com.exception.BadRequestException;
 import raicod3.example.com.exception.ForbiddenException;
 import raicod3.example.com.jwt.JwtUtils;
+import raicod3.example.com.model.OTPToken;
 import raicod3.example.com.model.RefreshToken;
 import raicod3.example.com.model.User;
+import raicod3.example.com.repository.OTPTokenRepository;
 import raicod3.example.com.repository.RefreshTokenRepository;
 import raicod3.example.com.repository.UserRepository;
 import raicod3.example.com.utilities.APIResponse;
+import raicod3.example.com.utilities.NumberHelper;
 import raicod3.example.com.utilities.PasswordValidation;
 
 import java.time.LocalDateTime;
@@ -44,18 +50,24 @@ public class AuthService {
     private final JwtUtils jwtUtils;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final NotificationService notificationService;
+    private final OTPTokenService otpTokenService;
+    private final OTPTokenRepository otpTokenRepository;
 
 
-    public AuthService(UserRepository userRepository, AuthenticationManager authenticationManager, CustomUserDetailsService customUserDetailsService, JwtUtils jwtUtils, PasswordEncoder passwordEncoder, RefreshTokenRepository refreshTokenRepository) {
+    public AuthService(UserRepository userRepository, AuthenticationManager authenticationManager, CustomUserDetailsService customUserDetailsService, JwtUtils jwtUtils, PasswordEncoder passwordEncoder, RefreshTokenRepository refreshTokenRepository, NotificationService notificationService, OTPTokenService otpTokenService, OTPTokenRepository otpTokenRepository) {
         this.userRepository = userRepository;
         this.authenticationManager = authenticationManager;
         this.customUserDetailsService = customUserDetailsService;
         this.jwtUtils = jwtUtils;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.notificationService = notificationService;
+        this.otpTokenService = otpTokenService;
+        this.otpTokenRepository = otpTokenRepository;
     }
 
-    public APIResponse registerUser(AuthRegistrationRequestDto request) {
+    public APIResponse registerUser(AuthRegistrationRequestDto request) throws MessagingException {
 
 
         Optional<User> foundUser = userRepository.findUserByEmail(request.getEmail());
@@ -89,9 +101,22 @@ public class AuthService {
 
         User savedUser = userRepository.save(user);
 
+        EmailRequest emailRequest = new EmailRequest();
+        emailRequest.setEmail(user.getEmail());
+        emailRequest.setSubject("Welcome to Sewa Sathi");
+
+        String otpToken = NumberHelper.generateOtp();
+
+        OTPToken generatedOtp = new OTPToken(otpToken, user);
+        generatedOtp.setOtpExpires(LocalDateTime.now().plusMinutes(5));
+
+        otpTokenRepository.save(generatedOtp);
+
+        notificationService.sendEmail(emailRequest, otpToken, "/email/verify-account");
+
         UserResponseDto userResponseDto = new UserResponseDto(savedUser);
 
-        return APIResponse.success(userResponseDto, "Successfully registered user", HttpStatus.CREATED);
+        return APIResponse.success(userResponseDto, "Successfully registered user.", Http_Constants.CREATED);
     }
 
     public APIResponse authenticate(AuthRequestDto request, HttpServletResponse response) {
@@ -131,7 +156,7 @@ public class AuthService {
         data.put("role", user.getRole());
         data.put("userId", user.getId());
 
-        return APIResponse.success(data, "Successfully authenticated user", HttpStatus.OK);
+        return APIResponse.success(data, "Successfully authenticated user.", Http_Constants.OK);
     }
 
     public APIResponse loginWithGoogle(GoogleLoginRequestDto request, HttpServletResponse response) {
@@ -199,7 +224,31 @@ public class AuthService {
         data.put("role", user.getRole());
         data.put("userId", user.getId());
 
-        return APIResponse.success(data, "Successfully authenticated user", HttpStatus.OK);
+        return APIResponse.success(data, "Successfully authenticated user.", Http_Constants.OK);
+    }
+
+    @Transactional
+    public APIResponse accountVerification (String otpToken) {
+        OTPToken existingToken = otpTokenService.getOTPTokenByOtpToken(otpToken);
+
+        if(existingToken.getOtpExpires().isBefore(LocalDateTime.now())) {
+            otpTokenService.deleteOTPToken(existingToken);
+            throw new BadRequestException("Expired OTP Token: Request a new OTP Token.");
+        }
+
+        User foundUser = userRepository.findById(existingToken.getUser().getId()).orElseThrow(() -> new BadRequestException("Account not found."));
+
+        if(foundUser.isActive()) {
+            otpTokenService.deleteOTPToken(existingToken);
+            throw new BadRequestException("Account is already verified.");
+        }
+
+        foundUser.setActive(true);
+        userRepository.save(foundUser);
+
+        otpTokenService.deleteOTPToken(existingToken);
+
+        return APIResponse.success(new UserResponseDto(foundUser), "Successfully Activated account.", Http_Constants.OK);
     }
 
 }
