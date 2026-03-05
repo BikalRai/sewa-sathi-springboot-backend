@@ -3,6 +3,7 @@ package raicod3.example.com.utilities;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.http.HttpStatus;
+import raicod3.example.com.constants.Http_Constants;
 import raicod3.example.com.enums.ErrorCode;
 
 
@@ -15,10 +16,18 @@ public class APIResponse {
     private Object data;
     private Object error;
     private Long timestamp;
-    private HttpStatus statusCode;
+    private int statusCode;
     private ErrorCode errorCode;
 
-    private APIResponse(boolean success, String message, Object data, Object error, HttpStatus statusCode, ErrorCode errorCode) {
+    private APIResponse(boolean success, String message, Object error,  int statusCode) {
+        this.success = success;
+        this.message = message;
+        this.error = error;
+        this.timestamp = System.currentTimeMillis();
+        this.statusCode = statusCode;
+    }
+
+    private APIResponse(boolean success, String message, Object data, Object error, int statusCode, ErrorCode errorCode) {
         this.success = success;
         this.message = message;
         this.data = data;
@@ -28,15 +37,19 @@ public class APIResponse {
         this.timestamp = System.currentTimeMillis();
     }
 
-    public static APIResponse success(Object data, String message, HttpStatus statusCode) {
+    public static APIResponse success( String message, int statusCode) {
+        return new APIResponse(true, message, null, statusCode );
+    }
+
+    public static APIResponse success(Object data, String message, int statusCode) {
         return new APIResponse(true, message, data, null, statusCode , null);
     }
 
-    public static APIResponse error(String message, HttpStatus statusCode, Object error, ErrorCode errorCode) {
+    public static APIResponse error(String message, int statusCode, Object error, ErrorCode errorCode) {
         return new APIResponse(false, message, null, error, statusCode, errorCode);
     }
 
-    public static APIResponse paginate(String message, HttpStatus statusCode, PaginationData data) {
+    public static APIResponse paginate(String message, int statusCode, PaginationData data) {
         return new APIResponse(true, message, data, null, statusCode , null);
     }
 

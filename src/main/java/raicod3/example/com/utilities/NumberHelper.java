@@ -4,7 +4,7 @@ import java.util.Random;
 
 public class NumberHelper {
 
-    public static StringBuilder generateOtp () {
+    public static String generateOtp () {
         StringBuilder otp = new StringBuilder();
         Random rand = new Random();
 
@@ -13,6 +13,6 @@ public class NumberHelper {
             otp.append(number);
         }
 
-        return otp;
+        return otp.toString();
     }
 }
