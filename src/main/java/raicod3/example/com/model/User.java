@@ -5,10 +5,10 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import raicod3.example.com.enums.AuthProvider;
 import raicod3.example.com.enums.UserRole;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -37,7 +37,7 @@ public class User {
     private boolean accountLocked;
     private LocalDateTime lockedAt;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<RefreshToken> refreshTokens;
-
+    @Enumerated(EnumType.STRING)
+    private AuthProvider provider;
+    private String providerId;
 }

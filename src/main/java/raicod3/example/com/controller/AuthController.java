@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import raicod3.example.com.dto.google.GoogleLoginRequestDto;
 import raicod3.example.com.dto.user.AuthRegistrationRequestDto;
 import raicod3.example.com.dto.user.AuthRequestDto;
 import raicod3.example.com.dto.user.UserResponseDto;
@@ -45,7 +46,7 @@ public class AuthController {
         log.info("Login request: {}", request.getEmail());
         APIResponse response = authService.authenticate(request, res);
         log.info("Login response: {}", response);
-        return new ResponseEntity<>(response,HttpStatus.CREATED);
+        return new ResponseEntity<>(response,HttpStatus.OK);
     }
 
     @GetMapping("/refresh")
@@ -60,5 +61,13 @@ public class AuthController {
         data.put("access_token", newAccessToken);
 
         return APIResponse.success(data, "Successfully authenticated user", HttpStatus.OK);
+    }
+
+    @PostMapping("/google")
+    public ResponseEntity<APIResponse> googleLogin(@RequestBody GoogleLoginRequestDto request, HttpServletResponse response) {
+        log.info("Attempting to lgin google login: {}", request);
+        APIResponse res = authService.loginWithGoogle(request, response);
+        log.info("Login response: {}", res);
+        return new ResponseEntity<>(res,HttpStatus.OK);
     }
 }
