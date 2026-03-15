@@ -1,21 +1,26 @@
-package raicod3.example.com.repository;
+    package raicod3.example.com.repository;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-import raicod3.example.com.model.User;
 
-import javax.swing.text.html.Option;
-import java.util.Optional;
-import java.util.UUID;
+    import org.springframework.data.domain.Page;
+    import org.springframework.data.domain.Pageable;
+    import org.springframework.data.jpa.repository.JpaRepository;
+    import org.springframework.stereotype.Repository;
+    import raicod3.example.com.model.User;
 
-@Repository
-public interface UserRepository extends JpaRepository<User, UUID> {
+    import java.util.List;
+    import java.util.Optional;
+    import java.util.UUID;
 
-    Optional<User> findUserByEmail(String email);
+    @Repository
+    public interface UserRepository extends JpaRepository<User, UUID> {
 
-    Optional<User> findUserByEmailAndPassword(String email, String password);
+        Optional<User> findUserByEmail(String email);
 
-    Optional<User> findByProviderId(String sub);
+        Optional<User> findUserByEmailAndPassword(String email, String password);
 
-    Optional<User> findByEmail(String email);
-}
+        Optional<User> findByProviderId(String sub);
+
+        Optional<User> findByEmail(String email);
+
+        Page<User> findAll(Pageable pageable);
+    }

@@ -13,8 +13,7 @@ public class EmailRequest {
     private String subject;
     private String body;
 
-    public EmailRequest(String email, String subject) {
+    public EmailRequest(String email) {
         this.email = email;
-        this.subject = subject;
     }
 }

@@ -49,7 +49,7 @@ public class APIResponse {
         return new APIResponse(false, message, null, error, statusCode, errorCode);
     }
 
-    public static APIResponse paginate(String message, int statusCode, PaginationData data) {
+    public static APIResponse paginate(String message, PaginationData data, int statusCode) {
         return new APIResponse(true, message, data, null, statusCode , null);
     }
 

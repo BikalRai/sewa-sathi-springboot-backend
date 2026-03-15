@@ -30,8 +30,7 @@ public class NotificationController {
         log.info("Generating OTP token for email: {} ", req.getEmail());
         OTPToken otpToken = otpTokenService.generateOTPToken(req.getEmail());
 
-
-        EmailRequest emailRequest = new EmailRequest(otpToken.getUser().getEmail(), "Request for OTP");
+        EmailRequest emailRequest = new EmailRequest(otpToken.getUser().getEmail());
         notificationService.sendEmail(emailRequest, otpToken.getOtpToken(), "/email/otp-request");
 
         return new ResponseEntity<>(APIResponse.success("Successfully sent email.", Http_Constants.OK), HttpStatus.OK);
