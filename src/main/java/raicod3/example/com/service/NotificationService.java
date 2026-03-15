@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 import raicod3.example.com.dto.email.EmailRequest;
+import raicod3.example.com.enums.TokenType;
 import raicod3.example.com.exception.BadRequestException;
 import raicod3.example.com.model.OTPToken;
 import raicod3.example.com.model.User;
@@ -39,7 +40,7 @@ public class NotificationService {
 
 
         User user = userRepository.findUserByEmail(req.getEmail()).orElseThrow(() -> new BadRequestException("User not found"));
-//        otpTokenRepository.save(new OTPToken(otpToken, user));
+        otpTokenRepository.save(new OTPToken(otpToken, user, TokenType.PASSWORD_RESET));
 
         Context context = new Context();
         context.setVariable("fullName", user.getFullName());

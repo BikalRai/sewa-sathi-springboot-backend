@@ -1,4 +1,4 @@
-package raicod3.example.com.dto;
+package raicod3.example.com.dto.otp;
 
 import lombok.*;
 import raicod3.example.com.dto.user.UserResponseDto;

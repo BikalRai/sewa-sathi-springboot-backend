@@ -10,14 +10,14 @@ import lombok.Setter;
 @Setter
 public class PaginationData {
 
-    private Object items;
+    private Object data;
     private int page;
     private int perPage;
-    private int total;
+    private long total;
     private int totalPages;
 
-    public PaginationData(Object items, int page, int perPage, int total) {
-        this.items = items;
+    public PaginationData(Object data, int page, int perPage, long total) {
+        this.data = data;
         this.page = page;
         this.perPage = perPage;
         this.total = total;

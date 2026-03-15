@@ -2,7 +2,8 @@ package raicod3.example.com.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import raicod3.example.com.dto.OTPTokenResponseDto;
+import raicod3.example.com.dto.otp.OtpRquestDto;
+import raicod3.example.com.enums.TokenType;
 import raicod3.example.com.exception.BadRequestException;
 import raicod3.example.com.exception.ResourceNotFoundException;
 import raicod3.example.com.model.OTPToken;
@@ -36,7 +37,7 @@ public class OTPTokenService {
 
         String token = NumberHelper.generateOtp();
 
-        OTPToken otpToken = new OTPToken(token, user);
+        OTPToken otpToken = new OTPToken(token, user, TokenType.GENERATION);
         otpToken.setOtpExpires(LocalDateTime.now().plusMinutes(5));
         otpTokenRepository.save(otpToken);
 
@@ -48,8 +49,8 @@ public class OTPTokenService {
 
     }
 
-    public Boolean validateOTPToken(String otpToken) {
-        OTPToken existingToken = otpTokenRepository.findOTPTokenByOtpToken(otpToken).orElseThrow(() -> new BadRequestException("Invalid OTP Token"));
+    public Boolean validateOTPToken(OtpRquestDto otpToken) {
+        OTPToken existingToken = otpTokenRepository.findOTPTokenByOtpToken(otpToken.getOtpToken()).orElseThrow(() -> new BadRequestException("Invalid OTP Token"));
 
         if(existingToken.getOtpExpires().isBefore(LocalDateTime.now())) {
             throw new BadRequestException("OTP Token expired");
@@ -65,11 +66,10 @@ public class OTPTokenService {
         return true;
     }
 
-    public Boolean deleteOTPToken(OTPToken otpToken) {
+    public void deleteOTPToken(OTPToken otpToken) {
         OTPToken existingToken = otpTokenRepository.findOTPTokenByOtpToken(otpToken.getOtpToken()).orElseThrow(() -> new BadRequestException("Invalid OTP Token"));
 
         otpTokenRepository.delete(existingToken);
 
-        return true;
     }
 }

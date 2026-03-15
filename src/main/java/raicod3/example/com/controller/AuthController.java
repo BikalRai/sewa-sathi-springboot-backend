@@ -12,8 +12,8 @@ import raicod3.example.com.dto.google.GoogleLoginRequestDto;
 import raicod3.example.com.dto.otp.OtpRquestDto;
 import raicod3.example.com.dto.user.AuthRegistrationRequestDto;
 import raicod3.example.com.dto.user.AuthRequestDto;
+import raicod3.example.com.dto.user.PasswordUpdateRequestDto;
 import raicod3.example.com.dto.user.UserResponseDto;
-import raicod3.example.com.exception.ForbiddenException;
 import raicod3.example.com.jwt.JwtUtils;
 import raicod3.example.com.model.RefreshToken;
 import raicod3.example.com.service.AuthService;
@@ -91,11 +91,21 @@ public class AuthController {
         log.info("Attempting to reset password: {}", req);
 
         String otpToken = NumberHelper.generateOtp();
+        req.setSubject("Forgot Password");
 
         notificationService.sendEmail(req, otpToken, "/email/forgot-password");
         log.info("Password reset email sent");
 
         return new ResponseEntity<>(APIResponse.success("Email sent successfully", Http_Constants.OK), HttpStatus.OK);
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<APIResponse> updatePassword(@RequestBody PasswordUpdateRequestDto request, HttpServletResponse response) throws MessagingException {
+        log.info("Attempting to update password: {}", request);
+
+        APIResponse res = authService.updatePassword(request, response);
+
+        return ResponseEntity.ok(res);
     }
 
 }

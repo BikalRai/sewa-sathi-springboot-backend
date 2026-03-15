@@ -2,6 +2,7 @@ package raicod3.example.com.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import raicod3.example.com.enums.TokenType;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -26,10 +27,14 @@ public class OTPToken {
     @JoinColumn(name = "user_id")
     private User user;
 
-    public OTPToken(String otpToken, User user) {
+    @Enumerated(EnumType.STRING)
+    private TokenType tokenType;
+
+    public OTPToken(String otpToken, User user, TokenType tokenType) {
         this.otpToken = otpToken;
         this.otpExpires = LocalDateTime.now().plusMinutes(5);
         this.user = user;
+        this.tokenType = tokenType;
     }
 
 }

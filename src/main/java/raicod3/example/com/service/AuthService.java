@@ -18,11 +18,14 @@ import raicod3.example.com.dto.email.EmailRequest;
 import raicod3.example.com.dto.google.GoogleLoginRequestDto;
 import raicod3.example.com.dto.user.AuthRegistrationRequestDto;
 import raicod3.example.com.dto.user.AuthRequestDto;
+import raicod3.example.com.dto.user.PasswordUpdateRequestDto;
 import raicod3.example.com.dto.user.UserResponseDto;
 import raicod3.example.com.enums.AuthProvider;
+import raicod3.example.com.enums.TokenType;
 import raicod3.example.com.enums.UserRole;
 import raicod3.example.com.exception.BadRequestException;
 import raicod3.example.com.exception.ForbiddenException;
+import raicod3.example.com.exception.ResourceNotFoundException;
 import raicod3.example.com.jwt.JwtUtils;
 import raicod3.example.com.model.OTPToken;
 import raicod3.example.com.model.RefreshToken;
@@ -107,7 +110,7 @@ public class AuthService {
 
         String otpToken = NumberHelper.generateOtp();
 
-        OTPToken generatedOtp = new OTPToken(otpToken, user);
+        OTPToken generatedOtp = new OTPToken(otpToken, user, TokenType.REGISTER);
         generatedOtp.setOtpExpires(LocalDateTime.now().plusMinutes(5));
 
         otpTokenRepository.save(generatedOtp);
@@ -249,6 +252,38 @@ public class AuthService {
         otpTokenService.deleteOTPToken(existingToken);
 
         return APIResponse.success(new UserResponseDto(foundUser), "Successfully Activated account.", Http_Constants.OK);
+    }
+
+    @Transactional
+    public APIResponse updatePassword(PasswordUpdateRequestDto request, HttpServletResponse response) {
+
+        if(!request.getPassword().equals(request.getConfirmPassword())) {
+            throw new BadRequestException("Passwords do not match.");
+        }
+
+        String passwordValidation = PasswordValidation.validatePassword(request.getPassword());
+
+        if(!passwordValidation.equals("Strong")) {
+            throw new BadRequestException(passwordValidation);
+        }
+
+        User user = userRepository.findUserByEmail(request.getEmail()).orElseThrow(() -> new ResourceNotFoundException("Email not found."));
+
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        userRepository.save(user);
+
+        UserResponseDto res = new UserResponseDto(user);
+
+        ResponseCookie cookie = ResponseCookie.from("Password-update", "changed")
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .sameSite("Lax")
+                .build();
+
+        response.setHeader("Set-Cookie", cookie.toString());
+
+        return APIResponse.success(res, "Successfully updated password.", Http_Constants.OK);
     }
 
 }
