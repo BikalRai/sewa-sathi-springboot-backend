@@ -9,6 +9,7 @@ import raicod3.example.com.model.Job;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -31,4 +32,8 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
 
     @Query("SELECT COUNT(b) FROM Bid b WHERE b.job.id = :jobId AND b.provider.id = :providerId")
     int countBidByProvider(@Param("jobId") UUID jobId, @Param("providerId") UUID providerId);
+
+    // JobRepository
+    @Query("SELECT j FROM Job j JOIN FETCH j.category WHERE j.id = :id")
+    Optional<Job> findByIdWithCategory(@Param("id") UUID id);
 }

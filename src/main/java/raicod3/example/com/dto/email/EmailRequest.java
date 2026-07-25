@@ -14,6 +14,9 @@ public class EmailRequest {
     private String body;
     private String otpToken;
     private String templatePath;
+    private String category;
+    private String description;
+    private String jobLink;
 
     public EmailRequest(String email) {
         this.email = email;
