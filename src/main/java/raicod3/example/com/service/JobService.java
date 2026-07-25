@@ -69,7 +69,7 @@ public class JobService {
 
         // 6. Publish to RabbitMQ safely AFTER commit
         if (images != null && !images.isEmpty()) {
-            JobAnalysisEvent event = new JobAnalysisEvent(savedJob.getId(), customer.getUser().getId().toString(), images);
+            JobAnalysisEvent event = new JobAnalysisEvent(savedJob.getId(), customer.getUser().getId().toString(), images, category.getName(),savedJob.getDescription());
 
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override

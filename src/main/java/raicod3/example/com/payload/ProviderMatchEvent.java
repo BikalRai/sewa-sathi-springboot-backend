@@ -1,12 +1,9 @@
 package raicod3.example.com.payload;
 
-import java.util.List;
 import java.util.UUID;
 
-public record JobAnalysisEvent(
+public record ProviderMatchEvent(
         UUID jobId,
-        String userId,
-        List<String> imageUrls,
         String category,
         String description
-) {}
+){}

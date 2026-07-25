@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>New Job Match</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f5f7fa; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+        .header { background-color: #07958A; padding: 20px; text-align: center; color: white; }
+        .content { padding: 30px; color: #333333; line-height: 1.6; }
+        .job-box { background-color: #f0f0f0; border-radius: 6px; padding: 16px; margin: 20px 0; color: #333; }
+        .category { display: inline-block; font-weight: bold; color: #07958A; margin-bottom: 8px; }
+        .footer { background-color: #f5f7fa; padding: 20px; text-align: center; font-size: 13px; color: #777777; }
+        .note { font-size: 14px; color: #555; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h2>New Job Match</h2>
+    </div>
+    <div class="content">
+        <p>Hello <strong th:text="${fullName}">Provider</strong>,</p>
+        <p>A new job matching your services was just posted on <strong>Sewalo</strong>:</p>
+
+        <div class="job-box">
+            <div class="category" th:text="${category}">Category</div>
+            <p th:text="${description}">Job description goes here.</p>
+        </div>
+
+        <p class="note">
+            <a th:href="${jobLink}" style="color:#07958A; font-weight:bold;">View job details and place a bid →</a>
+        </p>
+        <p class="note">Log in to view full details and place your bid before someone else does.</p>
+    </div>
+    <div class="footer">
+        <p>© <span th:text="${year}"></span> Sewa Sathi</p>
+        <p>Secure Notification System</p>
+    </div>
+</div>
+</body>
+</html>

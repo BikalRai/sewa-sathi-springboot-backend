@@ -28,6 +28,10 @@ public class RabbitMQConfig {
     public static final String EXCHANGE = "app.direct.exchange";
     public static final String DLQ_EXCHANGE = "app.direct.exchange";
 
+    public static final String PROVIDER_MATCH_QUEUE = "provider.match.queue";
+    public static final String PROVIDER_MATCH_EXCHANGE = "provider.match.exchange";
+    public static final String PROVIDER_MATCH_ROUTING_KEY = "provider.match";
+
     // Dead Letter Queue — the "failed mail" bin
     @Bean
     public Queue emailDlq() {
@@ -84,5 +88,22 @@ public class RabbitMQConfig {
         RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
         rabbitTemplate.setMessageConverter(messageConverter());
         return rabbitTemplate;
+    }
+
+    @Bean
+    public Queue providerMatchQueue() {
+        return new Queue(PROVIDER_MATCH_QUEUE, true);
+    }
+
+    @Bean
+    public DirectExchange providerMatchExchange() {
+        return new DirectExchange(PROVIDER_MATCH_EXCHANGE);
+    }
+
+    @Bean
+    public Binding providerMatchBinding() {
+        return BindingBuilder.bind(providerMatchQueue())
+                .to(providerMatchExchange())
+                .with(PROVIDER_MATCH_ROUTING_KEY);
     }
 }
