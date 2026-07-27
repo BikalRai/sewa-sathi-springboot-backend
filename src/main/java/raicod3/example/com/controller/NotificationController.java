@@ -40,7 +40,7 @@ public class NotificationController {
         return new ResponseEntity<>(APIResponse.success("Successfully sent email.", Http_Constants.OK), HttpStatus.OK);
     }
 
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'PROVIDER')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'PROVIDER', 'ADMIN')")
     @GetMapping
     public APIResponse getNotifications(@AuthenticationPrincipal CustomUserDetails principal) {
         return APIResponse.success(
@@ -49,7 +49,7 @@ public class NotificationController {
         );
     }
 
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'PROVIDER')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'PROVIDER', 'ADMIN')")
     @GetMapping("/unread-count")
     public APIResponse getUnreadCount(@AuthenticationPrincipal CustomUserDetails principal) {
         return APIResponse.success(
@@ -58,14 +58,14 @@ public class NotificationController {
         );
     }
 
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'PROVIDER')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'PROVIDER', 'ADMIN')")
     @PatchMapping("/{id}/read")
     public APIResponse markAsRead(@AuthenticationPrincipal CustomUserDetails principal, @PathVariable UUID id) {
         notificationQueryService.markAsRead(principal.getId(), id);
         return APIResponse.success(null, "Marked as read", 200);
     }
 
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'PROVIDER')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'PROVIDER', 'ADMIN')")
     @PatchMapping("/read-all")
     public APIResponse markAllAsRead(@AuthenticationPrincipal CustomUserDetails principal) {
         notificationQueryService.markAllAsRead(principal.getId());

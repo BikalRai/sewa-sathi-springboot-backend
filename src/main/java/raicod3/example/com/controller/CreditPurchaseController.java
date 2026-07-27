@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import raicod3.example.com.custom.CustomUserDetails;
+import raicod3.example.com.enums.PurchaseType;
 import raicod3.example.com.exception.ResourceNotFoundException;
 import raicod3.example.com.repository.CreditPurchaseRepository;
 import raicod3.example.com.repository.ProviderProfileRepository;
@@ -28,10 +29,15 @@ public class CreditPurchaseController {
 
     @PostMapping("/initiate")
     @PreAuthorize("hasRole('PROVIDER')")
-    public ResponseEntity<APIResponse> initiate(@RequestParam Integer creditsRequested, @AuthenticationPrincipal CustomUserDetails principal) {
-        var provider = providerProfileRepository.findByUserId(principal.getId()).orElseThrow(() -> new ResourceNotFoundException("Provider profile not found"));
+    public ResponseEntity<APIResponse> initiate(
+            @RequestParam(required = false, defaultValue = "0") Integer creditsRequested,
+            @RequestParam PurchaseType purchaseType,
+            @AuthenticationPrincipal CustomUserDetails principal) {
 
-        Map<String, Object> result = creditPurchaseService.initiatePurchase(provider.getId(), creditsRequested);
+        var provider = providerProfileRepository.findByUserId(principal.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Provider profile not found"));
+
+        Map<String, Object> result = creditPurchaseService.initiatePurchase(provider.getId(), creditsRequested, purchaseType);
 
         return ResponseEntity.ok(APIResponse.success(result, "Payment initiated", HttpStatus.OK.value()));
     }
@@ -40,7 +46,6 @@ public class CreditPurchaseController {
     @PreAuthorize("hasRole('PROVIDER')")
     public ResponseEntity<APIResponse> verify(@RequestParam String pidx) {
         String result = creditPurchaseService.verifyPurchase(pidx);
-
-        return  ResponseEntity.ok(APIResponse.success(result, "Payment verified", HttpStatus.OK.value()));
+        return ResponseEntity.ok(APIResponse.success(result, "Payment verified", HttpStatus.OK.value()));
     }
 }
