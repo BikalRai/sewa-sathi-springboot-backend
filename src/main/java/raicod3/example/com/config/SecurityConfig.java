@@ -55,6 +55,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/google/set-role").hasRole(GUEST)
                         .requestMatchers("/api/v1/auth/verify-account").hasAnyRole(CUSTOMER, PROVIDER)
                         .requestMatchers("/api/v1/auth/resend-code").hasAnyRole(CUSTOMER,PROVIDER)
+                        .requestMatchers("/api/v1/admin/**").hasRole(ADMIN)
                         .requestMatchers("/api/v1/notification/**").permitAll()
                         .requestMatchers("/api/v1/users/**").permitAll()
                         .requestMatchers("/api/v1/otp/**").permitAll()

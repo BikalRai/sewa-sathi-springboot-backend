@@ -15,7 +15,6 @@ import raicod3.example.com.exception.UnauthorizedException;
 import raicod3.example.com.model.Bid;
 import raicod3.example.com.model.Job;
 import raicod3.example.com.model.ProviderProfile;
-import raicod3.example.com.model.User;
 import raicod3.example.com.repository.*;
 
 import java.time.LocalDateTime;
@@ -40,11 +39,11 @@ public class BidService {
                 .orElseThrow(() -> new ResourceNotFoundException("Provider profile not found"));
 
         if(!provider.getIsVerified()) {
-            throw new UnauthorizedException("Your account is pending verification. You cannot bid yet.");
+            throw new BadRequestException("Your account is pending verification. You cannot bid yet.");
         }
 
         if(!provider.getIsActive()) {
-            throw  new UnauthorizedException("Your account is suspended.");
+            throw new BadRequestException("Your account is suspended.");
         }
 
         // Get job and validate biddable
