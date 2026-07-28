@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Account Verification Failed</title>
+</head>
+<body style="font-family: Arial, sans-serif; color: #333; padding: 20px;">
+
+<h2 style="color: #d9534f;">Verification Action Required</h2>
+
+<!-- Using the fullName variable from your NotificationService -->
+<p>Hello <span th:text="${fullName}">Provider</span>,</p>
+
+<p>We reviewed the citizenship documents you uploaded to Sewalo, but unfortunately, we could not approve your account at this time.</p>
+
+<p><strong>Reason:</strong></p>
+
+<!-- Using the description variable for the rejection reason -->
+<blockquote style="background: #f9f9f9; border-left: 4px solid #d9534f; padding: 10px;" th:text="${description}">
+    Your ID is too blurry.
+</blockquote>
+
+<p>Please log back into the Sewalo app and re-upload clear photos of your citizenship documents.</p>
+
+<p>Thank you,<br>The Sewalo Team</p>
+</body>
+</html>

@@ -38,6 +38,14 @@ public class JobController {
         return ResponseEntity.status(HttpStatus.CREATED).body(APIResponse.success(result, "Job posted successfully", Http_Constants.CREATED));
     }
 
+    @GetMapping("/admin/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<APIResponse> getAllJobs() {
+        List<JobResponseDto> result = jobService.getAllJobs();
+
+        return ResponseEntity.ok(APIResponse.success(result, "Jobs retrieved successfully", Http_Constants.OK));
+    }
+
     @GetMapping("/my")
     @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<APIResponse> getMyJobs(@AuthenticationPrincipal CustomUserDetails principal) {
