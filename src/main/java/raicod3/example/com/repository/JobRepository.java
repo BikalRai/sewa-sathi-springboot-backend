@@ -16,6 +16,13 @@ import java.util.UUID;
 public interface JobRepository extends JpaRepository<Job, UUID> {
     List<Job> findByStatusOrderByCreatedAtDesc(JobStatus status);
 
+    @Query("SELECT j FROM Job j " +
+            "JOIN FETCH j.category " +
+            "JOIN FETCH j.customer c " +
+            "JOIN FETCH c.user " +
+            "LEFT JOIN FETCH j.bids")
+    List<Job> findAllWithDetails();
+
     // Notice the query is now checking j.category.name
     @Query("SELECT j FROM Job j WHERE j.status = :status AND j.category.name IN :providerServices ORDER BY j.createdAt DESC")
     List<Job> findByStatusAndCategoryNameInOrderByCreatedAtDesc(

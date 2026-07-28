@@ -3,36 +3,38 @@ package raicod3.example.com.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import raicod3.example.com.dto.provider.ProviderAdminResponseDto;
-import raicod3.example.com.exception.ResourceNotFoundException;
+import raicod3.example.com.dto.admin.PendingProviderDto;
+import raicod3.example.com.enums.ProviderStatus;
 import raicod3.example.com.model.ProviderProfile;
 import raicod3.example.com.repository.ProviderProfileRepository;
 
 import java.util.List;
-import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class AdminService {
 
     private final ProviderProfileRepository providerProfileRepository;
+    private final ProviderService providerService;
 
-    @Transactional
-    public ProviderAdminResponseDto verifyProvider(UUID providerId) {
-        ProviderProfile provider = providerProfileRepository.findByIdWithServices(providerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
-
-        provider.setIsVerified(true);
-        providerProfileRepository.save(provider);
-
-        return new ProviderAdminResponseDto(provider);
-    }
 
     @Transactional(readOnly = true)
-    public List<ProviderAdminResponseDto> getPendingProviders() {
-        return providerProfileRepository.findByIsVerifiedFalseWithServices()
-                .stream()
-                .map(ProviderAdminResponseDto::new)
-                .toList();
+    public List<PendingProviderDto> getPendingProviders() {
+        List<ProviderProfile> pendingProfiles = providerProfileRepository.findByStatus(ProviderStatus.PENDING_APPROVAL);
+
+        return pendingProfiles.stream().map(profile -> {
+            String frontUrl = providerService.generateSignedKycUrl(profile.getCitizenshipFrontId());
+            String backUrl = providerService.generateSignedKycUrl(profile.getCitizenshipBackId());
+
+            return PendingProviderDto.builder()
+                    .id(profile.getId())
+                    .fullName(profile.getUser().getFullName())
+                    .email(profile.getUser().getEmail())
+                    .phoneNumber(profile.getUser().getPhoneNumber())
+                    .citizenshipFrontUrl(frontUrl)
+                    .citizenshipBackUrl(backUrl)
+                    .build();
+        }).collect(Collectors.toList());
     }
 }

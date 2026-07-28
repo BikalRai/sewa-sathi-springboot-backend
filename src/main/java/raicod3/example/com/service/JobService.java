@@ -84,6 +84,13 @@ public class JobService {
     }
 
     @Transactional(readOnly = true)
+    public List<JobResponseDto> getAllJobs() {
+        List<Job> jobs = jobRepository.findAllWithDetails();
+
+        return  jobs.stream().map(job -> toDto(job, true, true, false, null)).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<JobResponseDto> getJobs(UUID userId) {
         CustomerProfile customer = customerRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer profile not found"));
