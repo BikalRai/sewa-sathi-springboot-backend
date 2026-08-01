@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import raicod3.example.com.dto.bid.BidSummaryDto;
+import raicod3.example.com.dto.rating.RatingResponseDto;
 import raicod3.example.com.enums.JobDifficulty;
 import raicod3.example.com.enums.JobStatus;
 import raicod3.example.com.enums.Urgency;
@@ -37,4 +38,5 @@ public class JobResponseDto {
     private Double distance;
     private Boolean isUnlocked;
     private BidSummaryDto myBid;
+    private RatingResponseDto rating;
 }

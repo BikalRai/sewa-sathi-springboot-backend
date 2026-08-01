@@ -10,9 +10,11 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import raicod3.example.com.constants.Http_Constants;
 import raicod3.example.com.custom.CustomUserDetails;
+import raicod3.example.com.dto.job.CompleteJobRequestDto;
 import raicod3.example.com.dto.job.JobRequestDto;
 import raicod3.example.com.dto.job.JobResponseDto;
 import raicod3.example.com.dto.job.JobUnlockResponseDto;
+import raicod3.example.com.dto.provider.ProviderStatsDto;
 import raicod3.example.com.model.Job;
 import raicod3.example.com.model.JobUnlock;
 import raicod3.example.com.service.JobService;
@@ -107,4 +109,37 @@ public class JobController {
 
         return ResponseEntity.ok(APIResponse.success(result, "Jobs retrieved successfully", Http_Constants.OK));
     }
+
+    @GetMapping("/my/stats")
+    @PreAuthorize("hasRole('PROVIDER')")
+    public ResponseEntity<APIResponse> getProviderStats(@AuthenticationPrincipal CustomUserDetails principal) {
+        ProviderStatsDto result = jobService.getProviderStats(principal.getId());
+
+        return ResponseEntity.ok(APIResponse.success(result, "Provider stats retrieved successfully", Http_Constants.OK));
+    }
+
+    @PatchMapping("/{jobId}/complete")
+    @PreAuthorize("hasRole('PROVIDER')")
+    public ResponseEntity<APIResponse> completeJob(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @PathVariable("jobId") UUID jobId,
+            @RequestBody CompleteJobRequestDto dto) { // @Valid is omitted here if DTO fields are purely optional, but included if you have size constraints
+
+        JobResponseDto result = jobService.completeJob(principal.getId(), jobId, dto);
+
+        return ResponseEntity.ok(APIResponse.success(result, "Job marked as completed successfully", Http_Constants.OK));
+    }
+
+    @PatchMapping("/{jobId}/confirm-completion")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<APIResponse> confirmJobCompletion(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @PathVariable("jobId") UUID jobId) {
+
+        JobResponseDto result = jobService.confirmJobCompletion(principal.getId(), jobId);
+
+        return ResponseEntity.ok(APIResponse.success(result, "Job completion confirmed successfully", Http_Constants.OK));
+    }
+
+
 }
