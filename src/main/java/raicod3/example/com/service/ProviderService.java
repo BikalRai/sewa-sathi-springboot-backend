@@ -8,10 +8,8 @@ import org.springframework.transaction.annotation.Transactional;
 import raicod3.example.com.annotation.Auditable;
 import raicod3.example.com.dto.admin.KycRejectionDto;
 import raicod3.example.com.dto.email.EmailRequest;
-import raicod3.example.com.dto.provider.KycSubmissionRequestDto;
-import raicod3.example.com.dto.provider.OnboardingProviderRequestDto;
-import raicod3.example.com.dto.provider.ProviderCreditsResponseDto;
-import raicod3.example.com.dto.provider.ProviderResponseDto;
+import raicod3.example.com.dto.provider.*;
+import raicod3.example.com.dto.rating.RatingResponseDto;
 import raicod3.example.com.enums.ProviderStatus;
 import raicod3.example.com.exception.ResourceNotFoundException;
 import raicod3.example.com.exception.UnauthorizedException;
@@ -22,9 +20,11 @@ import raicod3.example.com.model.User;
 import raicod3.example.com.model.UserAddress;
 import raicod3.example.com.repository.ProviderCreditsRepository;
 import raicod3.example.com.repository.ProviderProfileRepository;
+import raicod3.example.com.repository.RatingRepository;
 import raicod3.example.com.repository.UserRepository;
 import raicod3.example.com.utilities.APIResponse;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -36,12 +36,22 @@ public class ProviderService {
     private final ProviderCreditsRepository providerCreditsRepository;
     private final Cloudinary cloudinary;
     private final RabbitMQProducer rabbitMQProducer;
+    private final RatingRepository ratingRepository;
 
     @Transactional(readOnly = true)
     public ProviderResponseDto findByUserId(UUID id) {
-        ProviderProfile provider = providerRepository.findByUserId(id).orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
+        // 1. Fetch the profile
+        ProviderProfile provider = providerRepository.findByUserId(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
 
-        return new ProviderResponseDto(provider, provider.getUser());
+        // 2. Fetch the credits (financial state)
+        // We use orElse(null) because if a user just signed up, the trigger to create
+        // their credits row might not have fired yet. The DTO handles the null gracefully.
+        ProviderCredits credits = providerCreditsRepository.findById(provider.getId())
+                .orElse(null);
+
+        // 3. Pass both to the DTO
+        return new ProviderResponseDto(provider, provider.getUser(), credits);
     }
 
     public ProviderCreditsResponseDto getProviderCredits(UUID providerId) {
@@ -52,7 +62,7 @@ public class ProviderService {
         log.debug("Fetching provider credits...");
         ProviderCredits credits =  providerCreditsRepository.findById(provider.getId()).orElseThrow(() -> new ResourceNotFoundException("provider credits not found"));
 
-        return new ProviderCreditsResponseDto(provider.getId(), credits.getBalance());
+        return new ProviderCreditsResponseDto(provider.getId(), credits.getBalance(), credits.getActiveTier(), credits.getCreatedAt(), credits.getUpdatedAt(), credits.getSubscriptionExpiresAt());
     }
 
     @Auditable(action = "PROVIDER_PERSONAL_DETAILS")
@@ -91,9 +101,13 @@ public class ProviderService {
         userRepository.save(user);
         providerRepository.save(providerProfile);
 
+        // --- NEW: Fetch credits to satisfy the updated ProviderResponseDto ---
+        // Using orElse(null) ensures that if the wallet doesn't exist yet, the app doesn't crash.
+        ProviderCredits credits = providerCreditsRepository.findById(providerProfile.getId()).orElse(null);
+
         log.info("Updating provider profile details successful.");
 
-        return APIResponse.success(new ProviderResponseDto(providerProfile, user), "Updated provider personal details", 200);
+        return APIResponse.success(new ProviderResponseDto(providerProfile, user, credits), "Updated provider personal details", 200);
     }
 
     @Transactional
@@ -173,6 +187,31 @@ public class ProviderService {
         return APIResponse.success(null, "Provider KYC rejected.", 200);
     }
 
+    @Transactional(readOnly = true)
+    public PublicProviderProfileDto getPublicProfile(UUID providerId) {
+        ProviderProfile provider = providerRepository.findById(providerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
+
+        Double avgRating = ratingRepository.findAverageScoreByProviderId(providerId);
+        long ratingCount = ratingRepository.countByProvider_Id(providerId);
+
+        List<RatingResponseDto> recentReviews = ratingRepository
+                .findTop10ByProvider_IdOrderByCreatedAtDesc(providerId)
+                .stream()
+                .map(RatingResponseDto::from)
+                .toList();
+
+        return new PublicProviderProfileDto(
+                provider.getId(),
+                provider.getUser().getFullName(),
+                provider.getUser().getImageUrl(),
+                provider.getServices() != null ? new java.util.ArrayList<>(provider.getServices()) : new java.util.ArrayList<>(),
+                avgRating,
+                ratingCount,
+                recentReviews
+        );
+    }
+
     // Helper method to generate a temporary, signed URL for Admin viewing
     public String generateSignedKycUrl(String publicId) {
         if (publicId == null || publicId.isEmpty()) return null;
@@ -184,4 +223,5 @@ public class ProviderService {
                 .signed(true)
                 .generate(publicId);
     }
+
 }

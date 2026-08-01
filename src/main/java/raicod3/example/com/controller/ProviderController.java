@@ -8,23 +8,21 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import raicod3.example.com.custom.CustomUserDetails;
-import raicod3.example.com.dto.provider.KycSubmissionRequestDto;
-import raicod3.example.com.dto.provider.OnboardingProviderRequestDto;
-import raicod3.example.com.dto.provider.ProviderCreditsResponseDto;
-import raicod3.example.com.dto.provider.ProviderResponseDto;
+import raicod3.example.com.dto.provider.*;
 import raicod3.example.com.service.ProviderService;
 import raicod3.example.com.utilities.APIResponse;
 
 import java.security.Principal;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/providers")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('PROVIDER')") // locks out customer
 public class ProviderController {
 
     private final ProviderService providerService;
 
+    @PreAuthorize("hasRole('PROVIDER')")
     @GetMapping("/me/credits")
     public ResponseEntity<APIResponse> getProviderCredits(@AuthenticationPrincipal CustomUserDetails principal) {
         ProviderCreditsResponseDto credits = providerService.getProviderCredits(principal.getId());
@@ -33,6 +31,7 @@ public class ProviderController {
     }
 
     // patch personal details
+    @PreAuthorize("hasRole('PROVIDER')")
     @PatchMapping("/update-personal")
     public ResponseEntity<APIResponse> updatePersonal(@RequestBody OnboardingProviderRequestDto request, Principal principal) {
         APIResponse res = providerService.updateProviderProfile(request, principal.getName());
@@ -40,6 +39,7 @@ public class ProviderController {
         return ResponseEntity.ok(res);
     }
 
+    @PreAuthorize("hasRole('PROVIDER')")
     @PostMapping("/kyc")
     public APIResponse submitKyc(
             @AuthenticationPrincipal CustomUserDetails principal,
@@ -49,9 +49,17 @@ public class ProviderController {
         return providerService.submitKycDocuments(principal.getUser().getId(), request);
     }
 
+    @PreAuthorize("hasRole('PROVIDER')")
     @GetMapping("/me")
     public ResponseEntity<APIResponse> getProviderProfile(@AuthenticationPrincipal CustomUserDetails principal) {
         ProviderResponseDto result = providerService.findByUserId(principal.getUser().getId());
+
+        return ResponseEntity.ok(APIResponse.success(result, "Provider profile fetched successfully.", HttpStatus.OK.value()));
+    }
+
+    @GetMapping("/{providerId}/public")
+    public ResponseEntity<APIResponse> getPublicProfile(@PathVariable UUID providerId) {
+        PublicProviderProfileDto result = providerService.getPublicProfile(providerId);
 
         return ResponseEntity.ok(APIResponse.success(result, "Provider profile fetched successfully.", HttpStatus.OK.value()));
     }

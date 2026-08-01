@@ -50,6 +50,14 @@ public class Job extends AbstractBaseEntity {
     @Column(name = "image_url")
     private List<String> images = new ArrayList<>();
 
+    @ElementCollection
+    @CollectionTable(name = "job_completion_images", joinColumns = @JoinColumn(name = "job_id"))
+    @Column(name = "image_url")
+    private List<String> completionImages = new ArrayList<>();
+
+    @Column(columnDefinition = "TEXT")
+    private String completionNotes;
+
     @Column(nullable = false, length = 500)
     private String address;
 
