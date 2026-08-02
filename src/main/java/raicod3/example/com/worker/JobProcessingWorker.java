@@ -7,9 +7,11 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import raicod3.example.com.config.RabbitMQConfig;
+import raicod3.example.com.payload.AiJobAnalysis;
 import raicod3.example.com.payload.JobAnalysisEvent;
 import raicod3.example.com.payload.ProviderMatchEvent;
 import raicod3.example.com.service.JobProcessingNotifier;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.InputStream;
 import java.net.URI;
@@ -23,10 +25,12 @@ public class JobProcessingWorker {
     private final RestClient restClient;
     private final JobProcessingNotifier notifier;
     private final AmqpTemplate rabbitTemplate;
+    private final ObjectMapper objectMapper;
 
-    public JobProcessingWorker(JobProcessingNotifier notifier, AmqpTemplate rabbitTemplate) {
+    public JobProcessingWorker(JobProcessingNotifier notifier, AmqpTemplate rabbitTemplate, ObjectMapper objectMapper) {
         this.notifier = notifier;
         this.rabbitTemplate = rabbitTemplate;
+        this.objectMapper = objectMapper;
 
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(5000);
@@ -43,6 +47,7 @@ public class JobProcessingWorker {
         log.info("Started processing image for Job ID: {}", event.jobId());
 
         try {
+            // Note: If you want to analyze ALL images, you'd loop here and pass a List of base64 strings to Ollama.
             String imageUrl = event.imageUrls().get(0);
             byte[] imageBytes;
 
@@ -51,15 +56,16 @@ public class JobProcessingWorker {
             }
 
             String base64Image = Base64.getEncoder().encodeToString(imageBytes);
-            String difficulty = analyzeImageWithGemma(base64Image, event.description());
 
-            log.info("AI Analysis completed successfully for Job ID: {}. Resulting Difficulty: {}", event.jobId(), difficulty);
+            // Get the rich structured analysis
+            AiJobAnalysis analysis = analyzeImageWithGemma(base64Image, event.description());
 
-            notifier.notifyUserJobActive(event.userId(), event.jobId(), difficulty);
+            log.info("AI Analysis completed. Difficulty: {}, Reasoning: {}, Est Hours: {}, Tools: {}",
+                    analysis.difficulty(), analysis.reasoning(), analysis.estimatedHours(), analysis.recommendedTools());
 
-            // Fire-and-forget: provider matching/notification is fully decoupled.
-            // If this publish fails, it must NEVER roll back the job-active update above —
-            // that's why it's outside notifier's @Transactional method and wrapped separately.
+            // Right now you only notify with difficulty, but you can update this signature later to pass the reasoning too!
+            notifier.notifyUserJobActive(event.userId(), event.jobId(), analysis);
+
             publishProviderMatchEvent(event);
 
         } catch (Exception e) {
@@ -80,33 +86,37 @@ public class JobProcessingWorker {
         }
     }
 
-    private String analyzeImageWithGemma(String base64Image, String description) {
+    private AiJobAnalysis analyzeImageWithGemma(String base64Image, String description) {
         log.info("Base64 Image length is: {} characters", base64Image.length());
 
-        if (base64Image.length() > 5_000_000) {
-            log.warn("WARNING: This image is extremely large. The HTTP request might choke!");
-        }
-
+        // 1. Give the AI a strict role and a strict JSON schema
         String prompt = """
-            You are assessing the difficulty of a home service job for a service marketplace.
+            You are an expert home service estimator.
+            
+            Customer description: "%s"
 
-            Job description from the customer: "%s"
-
-            Analyze the attached image together with this description and determine the difficulty
-            of completing this job. Consider factors like visible damage severity, access constraints,
-            and complexity implied by the description.
-
-            Reply with ONLY one word: LOW, MEDIUM, or HIGH.
+            Analyze the attached image and the customer's description. 
+            Assess the difficulty, estimate the time required, and list the tools needed.
+            
+            You MUST respond ONLY with valid JSON using this exact schema:
+            {
+              "difficulty": "LOW", // Strictly use LOW, MEDIUM, or HIGH
+              "reasoning": "Brief explanation of why you chose this difficulty.",
+              "estimatedHours": 1.5, // Numeric estimate
+              "recommendedTools": ["tool 1", "tool 2"]
+            }
             """.formatted(description != null && !description.isBlank() ? description : "No description provided.");
 
+        // 2. Add "format": "json" to the Ollama payload
         Map<String, Object> requestPayload = Map.of(
                 "model", "llava",
                 "prompt", prompt,
                 "images", List.of(base64Image),
+                "format", "json", // Forces Ollama to output valid JSON
                 "stream", false
         );
 
-        log.info("Executing POST request to Ollama at http://localhost:11434/api/generate...");
+        log.info("Executing POST request to Ollama...");
 
         @SuppressWarnings("unchecked")
         Map<String, Object> response = restClient.post()
@@ -115,11 +125,16 @@ public class JobProcessingWorker {
                 .retrieve()
                 .body(Map.class);
 
-        log.info("Successfully received HTTP response from Ollama API!");
-
         if (response != null && response.containsKey("response")) {
-            String aiResponse = String.valueOf(response.get("response"));
-            return aiResponse.trim().toUpperCase();
+            String aiResponseStr = String.valueOf(response.get("response"));
+
+            try {
+                // 3. Parse the JSON string directly into our Java Record
+                return objectMapper.readValue(aiResponseStr, AiJobAnalysis.class);
+            } catch (Exception e) {
+                log.error("Failed to parse AI JSON response: {}", aiResponseStr);
+                throw new RuntimeException("AI returned malformed JSON", e);
+            }
         }
 
         throw new RuntimeException("Invalid response from Ollama API");

@@ -9,8 +9,11 @@ import raicod3.example.com.enums.JobDifficulty;
 import raicod3.example.com.enums.JobStatus;
 import raicod3.example.com.exception.ResourceNotFoundException;
 import raicod3.example.com.model.Job;
+import raicod3.example.com.model.JobAnalysis;
+import raicod3.example.com.payload.AiJobAnalysis;
 import raicod3.example.com.payload.JobStatusPayload;
 import raicod3.example.com.repository.JobRepository;
+import raicod3.example.com.repository.JobAnalysisRepository;
 
 import java.util.UUID;
 
@@ -20,38 +23,56 @@ import java.util.UUID;
 public class JobProcessingNotifier {
 
     private final JobRepository jobRepository;
+    private final JobAnalysisRepository jobAnalysisRepository; // 1. Inject new repo
     private final SimpMessagingTemplate messagingTemplate;
 
     @Transactional
-    public void notifyUserJobActive(String userId, UUID jobId, String difficulty) {
-        // 1. Database Update: Persistence is mandatory
+    public void notifyUserJobActive(String userId, UUID jobId, AiJobAnalysis aiAnalysis) {
+
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
 
-        job.setStatus(JobStatus.OPEN);
+        // Safely parse difficulty
+        String difficultyStr = aiAnalysis.difficulty() != null ? aiAnalysis.difficulty().toUpperCase() : "MEDIUM";
         try {
-            job.setDifficulty(JobDifficulty.valueOf(difficulty));
+            job.setDifficulty(JobDifficulty.valueOf(difficultyStr));
         } catch (Exception e) {
             job.setDifficulty(JobDifficulty.MEDIUM);
         }
+
+        job.setStatus(JobStatus.OPEN); // Setting to OPEN as per your logic
+
+        // 3. Build the rich analysis entity and link it to the job
+        JobAnalysis analysisEntity = JobAnalysis.builder()
+                .job(job)
+                .difficulty(job.getDifficulty().name()) // Use the sanitized enum value
+                .reasoning(aiAnalysis.reasoning())
+                .estimatedHours(aiAnalysis.estimatedHours())
+                .recommendedTools(aiAnalysis.recommendedTools())
+                .build();
+
+        // 4. Save both (If cascade=ALL is set on Job.jobAnalysis, saving Job saves both.
+        // Otherwise, save explicitly to be safe)
+        job.setJobAnalysis(analysisEntity);
+        jobAnalysisRepository.save(analysisEntity);
         jobRepository.save(job);
 
-        // 2. Real-Time Update: Push to WebSocket
-        JobStatusPayload payload = new JobStatusPayload(jobId, "OPEN", difficulty, null);
+        // 5. Real-Time Update: Push to WebSocket
+        // We still just send the difficulty string to the frontend for now
+        JobStatusPayload payload = new JobStatusPayload(jobId, "OPEN", job.getDifficulty().name(), null);
         messagingTemplate.convertAndSendToUser(userId, "/queue/job-updates", payload);
 
-        log.info("Job {} updated to OPEN and notified user {}", jobId, userId);
+        log.info("Job {} updated to OPEN with rich AI analysis, notified user {}", jobId, userId);
     }
 
     @Transactional
     public void notifyUserJobFailed(String userId, UUID jobId, String reason) {
-        // 1. Database Update: Optional - keep as ANALYZING or set to FAILED?
-        // Usually, we set to FAILED so the user knows they need to intervene
-        Job job = jobRepository.findById(jobId).orElseThrow();
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
+
         job.setStatus(JobStatus.FAILED);
         jobRepository.save(job);
 
-        // 2. Real-Time Update
         JobStatusPayload payload = new JobStatusPayload(jobId, "FAILED", null, reason);
         messagingTemplate.convertAndSendToUser(userId, "/queue/job-updates", payload);
 

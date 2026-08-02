@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.Formula;
 import raicod3.example.com.dto.job.JobRequestDto;
 import raicod3.example.com.enums.JobDifficulty;
 import raicod3.example.com.enums.JobStatus;
@@ -55,6 +56,9 @@ public class Job extends AbstractBaseEntity {
     @Column(name = "image_url")
     private List<String> completionImages = new ArrayList<>();
 
+    @OneToOne(mappedBy = "job", cascade = CascadeType.ALL)
+    private JobAnalysis jobAnalysis;
+
     @Column(columnDefinition = "TEXT")
     private String completionNotes;
 
@@ -75,6 +79,9 @@ public class Job extends AbstractBaseEntity {
 
     @Enumerated(EnumType.STRING)
     private JobDifficulty difficulty;
+
+    @Formula("(SELECT COUNT(*) FROM job_unlocks ju WHERE ju.job_id = id)")
+    private Integer unlockCount;
 
     private LocalDateTime expiresAt;
     private LocalDateTime completedAt;

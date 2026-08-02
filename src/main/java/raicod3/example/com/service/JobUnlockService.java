@@ -24,6 +24,7 @@ import java.util.UUID;
 @Service
 public class JobUnlockService {
     private static final int UNLOCK_COST = 1;
+    private static final int MAX_UNLOCKS = 3;
 
     private final ProviderProfileRepository providerProfileRepository;
     private final JobRepository jobRepository;
@@ -34,41 +35,51 @@ public class JobUnlockService {
     @Transactional
     public JobUnlockResponseDto unlockJob(UUID userId, UUID jobId) {
         log.debug("Validating provider...");
-        ProviderProfile provider = providerProfileRepository.findByUserId(userId).orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
+        ProviderProfile provider = providerProfileRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
 
         log.debug("Unlocking job with id {}", jobId);
-        // 1. idempotency check - reject if already unlocked
+
+        // 1. Idempotency check - cheapest check, do this before locking anything
         if(jobUnlockRepository.existsByJob_IdAndProvider_Id(jobId, provider.getId())) {
             throw new BadRequestException("You have already unlocked this job.");
         }
 
-        // 2. atomic credit deduction - fails safely if balance insufficient
-        int rowsUpdated = providerCreditsRepository.deductCredits(provider.getId(), UNLOCK_COST);
-        if(rowsUpdated == 0) {
-            throw new BadRequestException("Insufficient credits to unlock this job..");
+        // 2. Acquire Pessimistic Write Lock on the Job
+        // Any other threads trying to unlock this exact job will PAUSE on this line
+        // until the current transaction completes.
+        Job job = jobRepository.findByIdWithWriteLock(jobId)
+                .orElseThrow(() -> new ResourceNotFoundException("Job not found."));
+
+        // 3. Verify Capacity
+        // Because of the lock, we are guaranteed this count is perfectly accurate
+        int currentUnlocks = jobUnlockRepository.countByJob_Id(jobId);
+        if (currentUnlocks >= MAX_UNLOCKS) {
+            throw new BadRequestException("This job has reached the maximum number of interested providers.");
         }
 
-        // 3. fetch the actual entities needed to build the Job unlock row
-        Job job = jobRepository.findById(jobId).orElseThrow(() -> new ResourceNotFoundException("Job not found."));
+        // 4. Atomic credit deduction
+        int rowsUpdated = providerCreditsRepository.deductCredits(provider.getId(), UNLOCK_COST);
+        if(rowsUpdated == 0) {
+            throw new BadRequestException("Insufficient credits to unlock this job.");
+        }
 
-        // 4. record the unlock - audit trail + DB-level unique constraint backstop
-        JobUnlock unlock = new  JobUnlock();
+        // 5. Record the unlock
+        JobUnlock unlock = new JobUnlock();
         unlock.setJob(job);
         unlock.setProvider(provider);
         unlock.setTokensSpent(UNLOCK_COST);
 
-        log.info("Unlocked job successfully");
-
         JobUnlock result = jobUnlockRepository.save(unlock);
-
-        log.info("Job unlocked successfully: {}", result);
+        log.info("Job unlocked successfully. Total unlocks for job {}: {}", jobId, currentUnlocks + 1);
 
         return JobUnlockResponseDto.from(result);
     }
 
     public List<JobUnlockResponseDto> unlockedobs(UUID userId) {
         log.debug("Validating provider...");
-        ProviderProfile provider = providerProfileRepository.findByUserId(userId).orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
+        ProviderProfile provider = providerProfileRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
 
         List<JobUnlock> unlocks = jobUnlockRepository.findAllByProviderId(provider.getId());
 

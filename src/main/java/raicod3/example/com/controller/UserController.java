@@ -1,5 +1,6 @@
 package raicod3.example.com.controller;
 
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -9,6 +10,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import raicod3.example.com.constants.Http_Constants;
 import raicod3.example.com.custom.CustomUserDetails;
+import raicod3.example.com.dto.customer.UpdateCustomerProfileRequest;
 import raicod3.example.com.dto.user.UserAddressDto;
 import raicod3.example.com.dto.user.UserResponseDto;
 import raicod3.example.com.service.UserAddressService;
@@ -70,5 +72,14 @@ public class UserController {
         APIResponse res = userAddressService.addUserAddress(userId, addressDto);
 
         return new ResponseEntity<>(res, HttpStatus.CREATED);
+    }
+
+    @PatchMapping("/profile")
+    public ResponseEntity<UserResponseDto> updateProfile(
+            @Valid @RequestBody UpdateCustomerProfileRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+
+        UserResponseDto updatedProfile = userService.updateCustomerProfile(userDetails.getId(), request);
+        return ResponseEntity.ok(updatedProfile);
     }
 }

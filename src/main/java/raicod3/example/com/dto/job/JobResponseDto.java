@@ -39,4 +39,6 @@ public class JobResponseDto {
     private Boolean isUnlocked;
     private BidSummaryDto myBid;
     private RatingResponseDto rating;
+    private int unlockCount;
+    private JobAnalysisDto aiAnalysis;
 }

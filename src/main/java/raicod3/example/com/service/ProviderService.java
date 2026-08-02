@@ -212,6 +212,37 @@ public class ProviderService {
         );
     }
 
+    @Transactional
+    @Auditable(action = "PROVIDER_UPDATE_PROFILE")
+    public ProviderResponseDto updateProfile(UUID userId, ProviderProfileUpdateDto dto) {
+
+        ProviderProfile provider = providerRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
+
+        User user = provider.getUser();
+        user.setPhoneNumber(dto.getPhoneNumber());
+        user.setImageUrl(dto.getImageUrl());
+
+        provider.updateFromProfileDto(dto);
+
+        UserAddress address = user.getUserAddress();
+        if (address == null) {
+            address = new UserAddress();
+            address.setUser(user);
+            user.setUserAddress(address);
+        }
+        address.setLatitude(dto.getLatitude());
+        address.setLongitude(dto.getLongitude());
+        address.setFormattedAddress(dto.getAddress());
+
+        providerRepository.save(provider);
+        userRepository.save(user);
+
+        ProviderCredits credits = providerCreditsRepository.findById(provider.getId()).orElse(null);
+
+        return new ProviderResponseDto(provider, user, credits);
+    }
+
     // Helper method to generate a temporary, signed URL for Admin viewing
     public String generateSignedKycUrl(String publicId) {
         if (publicId == null || publicId.isEmpty()) return null;
@@ -223,5 +254,6 @@ public class ProviderService {
                 .signed(true)
                 .generate(publicId);
     }
+
 
 }

@@ -27,12 +27,16 @@ public class UserResponseDto {
     private String address;
     private Double lat;
     private Double lng;
+    private String phoneNumber;
+    private String imageUrl;
 
     public UserResponseDto(User user ) {
         this.id = user.getId();
         this.fullName = user.getFullName();
         this.email = user.getEmail();
         this.role = user.getRole().name();
+        this.phoneNumber = user.getPhoneNumber();
+        this.imageUrl = user.getImageUrl();
         this.createdAt = user.getCreatedAt();
         this.isActive = user.isActive();
         this.isOnboarded = user.isOnboarded();
