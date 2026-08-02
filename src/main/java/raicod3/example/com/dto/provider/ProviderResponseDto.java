@@ -10,6 +10,7 @@ import raicod3.example.com.enums.SubscriptionTier;
 import raicod3.example.com.model.ProviderCredits;
 import raicod3.example.com.model.ProviderProfile;
 import raicod3.example.com.model.User;
+import raicod3.example.com.model.UserAddress;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -38,6 +39,12 @@ public class ProviderResponseDto {
     private Integer tokenBalance;
     private LocalDateTime subscriptionExpiresAt;
 
+    private Double latitude;
+    private Double longitude;
+    private String address;
+
+    private String experience;
+
     public ProviderResponseDto(ProviderProfile profile, User user, ProviderCredits credits) {
         this.id = profile.getId();
         this.status = profile.getStatus();
@@ -65,5 +72,14 @@ public class ProviderResponseDto {
             this.tokenBalance = 0;
             this.subscriptionExpiresAt = null;
         }
+
+        UserAddress userAddress = user.getUserAddress();
+        if (userAddress != null) {
+            this.latitude = userAddress.getLatitude();
+            this.longitude = userAddress.getLongitude();
+            this.address = userAddress.getFormattedAddress();
+        }
+
+        this.experience = profile.getExperience();
     }
 }

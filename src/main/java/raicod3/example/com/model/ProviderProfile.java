@@ -3,6 +3,7 @@ package raicod3.example.com.model;
 import jakarta.persistence.*;
 import lombok.*;
 import raicod3.example.com.dto.provider.OnboardingProviderRequestDto;
+import raicod3.example.com.dto.provider.ProviderProfileUpdateDto;
 import raicod3.example.com.enums.ProviderStatus;
 
 import java.util.List;
@@ -65,6 +66,15 @@ public class ProviderProfile {
 
     public void updateFromDto(OnboardingProviderRequestDto req) {
         this.gender = req.getGender();
+        this.experience = req.getExperience();
+        this.services = req.getServices();
+        this.workDistrict = req.getWorkArea();
+        this.bio = req.getBio();
+        this.pricingBasis = req.getPricingBasis();
+        this.startingRate = req.getStartingRate();
+    }
+
+    public void updateFromProfileDto(ProviderProfileUpdateDto req) {
         this.experience = req.getExperience();
         this.services = req.getServices();
         this.workDistrict = req.getWorkArea();

@@ -15,4 +15,6 @@ public interface JobUnlockRepository extends JpaRepository<JobUnlock, UUID> {
     List<JobUnlock> findAllByProviderId(UUID providerId);
 
     List<JobUnlock> findByProviderIdAndJobIdIn(UUID providerId, List<UUID> jobIds);
+
+    int countByJob_Id(UUID jobId);
 }

@@ -1,6 +1,8 @@
 package raicod3.example.com.repository;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -43,4 +45,8 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
     // JobRepository
     @Query("SELECT j FROM Job j JOIN FETCH j.category WHERE j.id = :id")
     Optional<Job> findByIdWithCategory(@Param("id") UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT j FROM Job j WHERE j.id = :id")
+    Optional<Job> findByIdWithWriteLock(@Param("id") UUID id);
 }

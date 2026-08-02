@@ -40,6 +40,18 @@ public class ProviderController {
     }
 
     @PreAuthorize("hasRole('PROVIDER')")
+    @PatchMapping("/me")
+    public ResponseEntity<APIResponse> updateProfile(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @Valid @RequestBody ProviderProfileUpdateDto dto
+    ) {
+        ProviderResponseDto updated = providerService.updateProfile(principal.getId(), dto);
+        return ResponseEntity.ok(
+                APIResponse.success(updated, "Profile updated successfully", HttpStatus.OK.value())
+        );
+    }
+
+    @PreAuthorize("hasRole('PROVIDER')")
     @PostMapping("/kyc")
     public APIResponse submitKyc(
             @AuthenticationPrincipal CustomUserDetails principal,

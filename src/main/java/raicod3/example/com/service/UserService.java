@@ -3,11 +3,14 @@ package raicod3.example.com.service;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import raicod3.example.com.annotation.Auditable;
 import raicod3.example.com.custom.CustomUserDetails;
+import raicod3.example.com.dto.customer.UpdateCustomerProfileRequest;
 import raicod3.example.com.dto.user.UserResponseDto;
 import raicod3.example.com.exception.ResourceNotFoundException;
 import raicod3.example.com.model.User;
+import raicod3.example.com.model.UserAddress;
 import raicod3.example.com.repository.UserRepository;
 import java.util.UUID;
 
@@ -47,4 +50,36 @@ public class UserService {
     }
 
 
+    @Transactional
+    public UserResponseDto updateCustomerProfile(UUID userId, UpdateCustomerProfileRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Safely update basic fields
+        if (request.getFullName() != null) {
+            user.setFullName(request.getFullName());
+        }
+        if (request.getPhoneNumber() != null) {
+            user.setPhoneNumber(request.getPhoneNumber());
+        }
+        if (request.getImageUrl() != null) {
+            user.setImageUrl(request.getImageUrl());
+        }
+
+        // Safely update Address relationship
+        if (request.getLatitude() != null && request.getLongitude() != null) {
+            UserAddress address = user.getUserAddress();
+            if (address == null) {
+                address = new UserAddress();
+                address.setUser(user); // Establish the bidirectional link
+            }
+            address.setLatitude(request.getLatitude());
+            address.setLongitude(request.getLongitude());
+            address.setFormattedAddress(request.getAddress());
+            user.setUserAddress(address);
+        }
+
+        User savedUser = userRepository.save(user);
+        return new UserResponseDto(savedUser);
+    }
 }

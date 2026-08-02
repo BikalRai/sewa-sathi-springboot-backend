@@ -11,6 +11,7 @@ import raicod3.example.com.annotation.Auditable;
 import raicod3.example.com.config.RabbitMQConfig;
 import raicod3.example.com.dto.bid.BidSummaryDto;
 import raicod3.example.com.dto.job.CompleteJobRequestDto;
+import raicod3.example.com.dto.job.JobAnalysisDto;
 import raicod3.example.com.dto.job.JobRequestDto;
 import raicod3.example.com.dto.job.JobResponseDto;
 import raicod3.example.com.dto.provider.ProviderStatsDto;
@@ -22,6 +23,7 @@ import raicod3.example.com.exception.ResourceNotFoundException;
 import raicod3.example.com.exception.UnauthorizedException;
 import raicod3.example.com.model.*;
 import raicod3.example.com.payload.JobAnalysisEvent;
+import raicod3.example.com.payload.JobMatchEvent;
 import raicod3.example.com.repository.*;
 import raicod3.example.com.utilities.LocationUtils;
 
@@ -68,21 +70,26 @@ public class JobService {
             job.setStatus(JobStatus.OPEN);
         }
 
-        // 5. Save Job (Location is now safely stored in the `jobs` table)
+        // 5. Save Job
         Job savedJob = jobRepository.saveAndFlush(job);
 
         // 6. Publish to RabbitMQ safely AFTER commit
-        if (images != null && !images.isEmpty()) {
-            JobAnalysisEvent event = new JobAnalysisEvent(savedJob.getId(), customer.getUser().getId().toString(), images, category.getName(),savedJob.getDescription());
-
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                if (images != null && !images.isEmpty()) {
+                    // Send for AI processing
+                    JobAnalysisEvent event = new JobAnalysisEvent(savedJob.getId(), customer.getUser().getId().toString(), images, category.getName(), savedJob.getDescription());
                     rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE, RabbitMQConfig.JOB_ANALYSIS_ROUTING_KEY, event);
-                    log.info("Published JobAnalysisEvent to RabbitMQ for Job ID: {}", savedJob.getId());
+                    log.info("Published JobAnalysisEvent for Job ID: {}", savedJob.getId());
+                } else {
+                    // Instantly trigger matchmaking since it's an OPEN job
+                    JobMatchEvent event = new JobMatchEvent(savedJob.getId());
+                    rabbitTemplate.convertAndSend(RabbitMQConfig.PROVIDER_MATCH_EXCHANGE, RabbitMQConfig.PROVIDER_MATCH_ROUTING_KEY, event);
+                    log.info("Published JobMatchEvent for Job ID: {}", savedJob.getId());
                 }
-            });
-        }
+            }
+        });
 
         return toDto(savedJob, true, true, false, null);
     }
@@ -437,10 +444,7 @@ public class JobService {
                 .longitude(job.getLongitude())
 
                 // --- THE GATEKEEPER LOGIC ---
-                // If true, show the real address. If false, show the masked area (e.g., "New Baneshwor").
                 .address(showFullAddress ? job.getAddress() : job.getMaskedAddress())
-
-                // If true, show the real number. If false, send null so the UI can't render it.
                 .contactNumber(showContact ? job.getContactNumber() : null)
                 .isUnlocked(isUnLocked)
 
@@ -450,6 +454,11 @@ public class JobService {
                 .createdAt(job.getCreatedAt())
                 .expiresAt(job.getExpiresAt())
                 .myBid(myBid)
+                .unlockCount(job.getUnlockCount() != null ? job.getUnlockCount() : 0)
+
+                // --- THE NEW AI ANALYSIS MAPPING ---
+                .aiAnalysis(job.getJobAnalysis() != null ? new JobAnalysisDto(job.getJobAnalysis()) : null)
+
                 .build();
     }
 
