@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import raicod3.example.com.dto.admin.AdminJobDto;
 import raicod3.example.com.enums.JobStatus;
 import raicod3.example.com.model.Job;
 
@@ -49,4 +50,21 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT j FROM Job j WHERE j.id = :id")
     Optional<Job> findByIdWithWriteLock(@Param("id") UUID id);
+
+    @Query(value = "SELECT DATE(created_at) as eventDate, COUNT(id) as totalCount " +
+            "FROM jobs " +
+            "WHERE created_at >= :startDate " +
+            "GROUP BY DATE(created_at)", nativeQuery = true)
+    List<Object[]> countJobsByDate(@Param("startDate") LocalDateTime startDate);
+
+    @Query("SELECT new raicod3.example.com.dto.admin.AdminJobDto(" +
+            "j.id, j.description, j.status, c.user.fullName, " +
+            "COUNT(DISTINCT b.id), j.unlockCount, " +
+            "j.createdAt, j.expiresAt) " +
+            "FROM Job j " +
+            "JOIN j.customer c " +
+            "LEFT JOIN Bid b ON b.job = j " +
+            "GROUP BY j.id, j.description, j.status, c.user.fullName, j.unlockCount, j.createdAt, j.expiresAt " +
+            "ORDER BY j.createdAt DESC")
+    List<AdminJobDto> findAllForAdmin();
 }

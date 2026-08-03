@@ -147,6 +147,7 @@ public class ProviderService {
         }
 
         profile.setStatus(ProviderStatus.APPROVED);
+        profile.setIsVerified(true);
         providerRepository.save(profile);
 
         // Build and send the Approval email
@@ -201,6 +202,10 @@ public class ProviderService {
                 .map(RatingResponseDto::from)
                 .toList();
 
+        String activeTier = providerCreditsRepository.findById(providerId)
+                .map(credits -> credits.getActiveTier() != null ? credits.getActiveTier().name() : "FREE")
+                .orElse("FREE");
+
         return new PublicProviderProfileDto(
                 provider.getId(),
                 provider.getUser().getFullName(),
@@ -208,7 +213,8 @@ public class ProviderService {
                 provider.getServices() != null ? new java.util.ArrayList<>(provider.getServices()) : new java.util.ArrayList<>(),
                 avgRating,
                 ratingCount,
-                recentReviews
+                recentReviews,
+                activeTier
         );
     }
 

@@ -14,12 +14,15 @@ import raicod3.example.com.exception.ResourceNotFoundException;
 import raicod3.example.com.exception.UnauthorizedException;
 import raicod3.example.com.model.Bid;
 import raicod3.example.com.model.Job;
+import raicod3.example.com.model.ProviderCredits;
 import raicod3.example.com.model.ProviderProfile;
 import raicod3.example.com.repository.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -27,13 +30,15 @@ public class BidService {
     private final BidRepository bidRepository;
     private final JobRepository jobRepository;
     private final ProviderProfileRepository providerProfileRepository;
-    private final JobUnlockRepository jobUnlockRepository;
+
+    // 1. Inject the credits repository
+    private final ProviderCreditsRepository providerCreditsRepository;
 
     // Provider place a bid
     @Transactional
     @Auditable(action = "PROVIDER_PLACE_BID")
     public BidConfirmationDto placeBid(UUID userId, UUID jobId, BidRequestDto dto) {
-        // Get provider and run safety gate
+        // ... (Your existing placeBid logic remains exactly the same)
         ProviderProfile provider = providerProfileRepository
                 .findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider profile not found"));
@@ -46,7 +51,6 @@ public class BidService {
             throw new BadRequestException("Your account is suspended.");
         }
 
-        // Get job and validate biddable
         Job job = jobRepository.findById(jobId).orElseThrow(() -> new ResourceNotFoundException("Job not found"));
 
         if(job.getStatus() != JobStatus.OPEN) {
@@ -57,49 +61,63 @@ public class BidService {
             throw new BadRequestException("This job has expired");
         }
 
-        // Provider cannot bid on their own
         boolean isOwnJob = job.getCustomer().getUser().getId().equals(userId);
         if (isOwnJob) {
             throw new BadRequestException("You cannot bid on your own job");
         }
 
-        // Check for duplicate bid
         if (bidRepository.existsByJobIdAndProviderId(jobId, provider.getId())) {
             throw new BadRequestException("You have already placed a bid on this job");
         }
 
-        // Enforce max 3 active bids
         int activeBidCount = bidRepository.countActiveBids(jobId);
         if (activeBidCount >= 3) {
-            throw new BadRequestException(
-                    "This job already has the maximum number of bids");
+            throw new BadRequestException("This job already has the maximum number of bids");
         }
 
-        // Save bid
         Bid bid = new Bid();
         bid.setJob(job);
         bid.setProvider(provider);
         bid.setMessage(dto.getMessage());
         bid.setQuotedPrice(dto.getQuotedPrice());
-//        bid.setPricingBasis(dto.getPricingBasis());
 
         return BidConfirmationDto.from(bidRepository.save(bid));
     }
 
     // Customer get bids for job
-    @Transactional
+    @Transactional(readOnly = true)
     public List<BidSummaryDto> getBidsForJob(UUID userId, UUID jobId) {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found"));
 
-        // Only the job owner can see bids
         if (!job.getCustomer().getUser().getId().equals(userId)) {
             throw new UnauthorizedException("You don't have access to this job's bids");
         }
 
-        return bidRepository.findByJobIdOrderByCreatedAtAsc(jobId)
+        List<Bid> bids = bidRepository.findByJobIdOrderByCreatedAtAsc(jobId);
+
+        if (bids.isEmpty()) {
+            return List.of();
+        }
+
+        // 2. BATCH FETCH LOGIC: Extract IDs and query tiers all at once
+        List<UUID> providerIds = bids.stream()
+                .map(bid -> bid.getProvider().getId())
+                .toList();
+
+        Map<UUID, String> providerTiers = providerCreditsRepository.findAllById(providerIds)
                 .stream()
-                .map(bid -> BidSummaryDto.from(bid, false))
+                .collect(Collectors.toMap(
+                        ProviderCredits::getProviderId,
+                        credits -> credits.getActiveTier() != null ? credits.getActiveTier().name() : "FREE"
+                ));
+
+        // 3. Map to DTO injecting the memory lookup
+        return bids.stream()
+                .map(bid -> {
+                    String tier = providerTiers.getOrDefault(bid.getProvider().getId(), "FREE");
+                    return BidSummaryDto.from(bid, false, tier);
+                })
                 .toList();
     }
 
@@ -129,26 +147,26 @@ public class BidService {
             throw new BadRequestException("This bid is no longer available.");
         }
 
-        // Accept winning bid
         winningBid.setStatus(BidStatus.ACCEPTED);
 
-        // Reject all other bids on this job
         bidRepository.findByJobIdAndStatusNot(jobId, BidStatus.WITHDRAWN)
                 .stream()
                 .filter(b -> !b.getId().equals(bidId))
                 .forEach(b -> b.setStatus(BidStatus.REJECTED));
 
-        // Move job to IN_PROGRESS
         job.setStatus(JobStatus.IN_PROGRESS);
         jobRepository.save(job);
 
-        return BidSummaryDto.from(bidRepository.save(winningBid), true);
+        // 4. Inject tier for the single accepted bid
+        String activeTier = getActiveTierForProvider(winningBid.getProvider().getId());
+        return BidSummaryDto.from(bidRepository.save(winningBid), true, activeTier);
     }
 
     // Provider withdraw their bid
     @Transactional
     @Auditable(action = "PROVIDER_WITHDRAW_BID")
     public BidConfirmationDto withdrawBid(UUID userId, UUID bidId) {
+        // ... (Your existing withdrawBid logic remains exactly the same)
         ProviderProfile provider = providerProfileRepository
                 .findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider profile not found"));
@@ -164,7 +182,8 @@ public class BidService {
         return BidConfirmationDto.from(bidRepository.save(bid));
     }
 
-    //    Provider view their own bids
+    // Provider view their own bids
+    @Transactional(readOnly = true)
     public List<BidConfirmationDto> getMyBids(UUID userId) {
         ProviderProfile provider = providerProfileRepository
                 .findByUserId(userId)
@@ -185,4 +204,10 @@ public class BidService {
         );
     }
 
+    // 5. Helper method
+    private String getActiveTierForProvider(UUID providerId) {
+        return providerCreditsRepository.findById(providerId)
+                .map(credits -> credits.getActiveTier() != null ? credits.getActiveTier().name() : "FREE")
+                .orElse("FREE");
+    }
 }

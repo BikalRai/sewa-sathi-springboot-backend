@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 import raicod3.example.com.enums.BidStatus;
 import raicod3.example.com.model.Bid;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -43,4 +44,13 @@ public interface BidRepository extends JpaRepository<Bid, UUID> {
             @Param("providerId") UUID providerId,
             @Param("statuses") List<BidStatus> statuses
     );
+
+    @Query(value = "SELECT DATE(created_at) as eventDate, COUNT(id) as totalCount " +
+            "FROM bids " +
+            "WHERE created_at >= :startDate " +
+            "GROUP BY DATE(created_at)", nativeQuery = true)
+    List<Object[]> countBidsByDate(@Param("startDate") LocalDateTime startDate);
+
+    @Query("SELECT b.provider.id, COUNT(b) FROM Bid b GROUP BY b.provider.id")
+    List<Object[]> countBidsGroupedByProvider();
 }

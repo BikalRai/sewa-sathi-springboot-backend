@@ -11,5 +11,6 @@ public record PublicProviderProfileDto(UUID providerId,
                                        List<String> services,
                                        Double avgRating,
                                        long ratingCount,
-                                       List<RatingResponseDto> recentReviews) {
+                                       List<RatingResponseDto> recentReviews,
+                                       String activeTier) {
 }
