@@ -21,9 +21,10 @@ public record BidSummaryDto(
         String pricingBasis,
         BidStatus status,
         Boolean contactUnlocked,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        String subscriptionTier
 ) {
-    public static BidSummaryDto from(Bid bid, boolean revealPhone) {
+    public static BidSummaryDto from(Bid bid, boolean revealPhone, String subscriptionTier) {
         return BidSummaryDto.builder()
                 .id(bid.getId())
                 .providerId(bid.getProvider().getId())
@@ -38,6 +39,7 @@ public record BidSummaryDto(
                 .status(bid.getStatus())
                 .contactUnlocked(bid.getContactUnlocked())
                 .createdAt(bid.getCreatedAt())
+                .subscriptionTier(subscriptionTier)
                 .build();
     }
 }

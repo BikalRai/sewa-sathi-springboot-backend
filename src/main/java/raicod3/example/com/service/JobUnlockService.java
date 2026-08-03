@@ -38,6 +38,10 @@ public class JobUnlockService {
         ProviderProfile provider = providerProfileRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
 
+        if(!provider.getIsVerified()){
+            throw new BadRequestException("Provider is not verified");
+        }
+
         log.debug("Unlocking job with id {}", jobId);
 
         // 1. Idempotency check - cheapest check, do this before locking anything

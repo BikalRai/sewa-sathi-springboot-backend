@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import raicod3.example.com.dto.admin.AdminProviderDto;
 import raicod3.example.com.enums.ProviderStatus;
 import raicod3.example.com.model.ProviderProfile;
 
@@ -30,4 +31,13 @@ public interface ProviderProfileRepository extends JpaRepository<ProviderProfile
 
     // --- NEW: Added for the state-machine-based Admin KYC queue ---
     List<ProviderProfile> findByStatus(ProviderStatus status);
+
+    @Query("SELECT new raicod3.example.com.dto.admin.AdminProviderDto(" +
+            "p.id, p.user.fullName, p.user.email, p.status, " +
+            "COALESCE(c.balance, 0), COALESCE(c.activeTier, raicod3.example.com.enums.SubscriptionTier.FREE), " +
+            "0L, 0L, p.user.createdAt) " +
+            "FROM ProviderProfile p " +
+            "LEFT JOIN ProviderCredits c ON c.provider = p " +
+            "ORDER BY p.user.createdAt DESC")
+    List<AdminProviderDto> findAllForAdmin();
 }

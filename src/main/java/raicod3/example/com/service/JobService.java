@@ -45,6 +45,7 @@ public class JobService {
     private final RatingRepository ratingRepository;
     private final ProviderRepository providerRepository;
     private final NotificationRepository notificationRepository;
+    private final ProviderCreditsRepository providerCreditsRepository;
 
     // Customer post a job
     @Transactional
@@ -178,11 +179,15 @@ public class JobService {
         Double providerLon = providerAddress != null ? providerAddress.getLongitude() : null;
 
         // 2. Map to DTO in memory
+        String activeTier = getActiveTierForProvider(provider.getId());
+
+        // Update the mapping logic inside the stream:
         return matchedJobs.stream().map(job -> {
-            // Fast memory lookups instead of database hits
             boolean isUnlocked = unlockedJobIds.contains(job.getId());
             Bid myBid = providerBidsMap.get(job.getId());
-            BidSummaryDto bidSummary = myBid != null ? BidSummaryDto.from(myBid, false) : null;
+
+            // UPDATE THIS LINE (pass activeTier)
+            BidSummaryDto bidSummary = myBid != null ? BidSummaryDto.from(myBid, false, activeTier) : null;
 
             if (providerLat == null || providerLon == null) {
                 // Fallback if provider has no address
@@ -230,9 +235,13 @@ public class JobService {
         Double providerLon = providerAddress != null ? providerAddress.getLongitude() : null;
 
         // 4. Map directly to DTOs in O(N) time with zero extra database hits
+        String activeTier = getActiveTierForProvider(provider.getId());
+
         return myBids.stream().map(bid -> {
             Job job = bid.getJob();
-            BidSummaryDto bidSummary = BidSummaryDto.from(bid, false);
+
+            // UPDATE THIS LINE (pass activeTier)
+            BidSummaryDto bidSummary = BidSummaryDto.from(bid, false, activeTier);
 
             // SECURITY CHECK: Only reveal exact address and phone number if the bid was Accepted.
             // A Pending bid means the customer hasn't hired them yet.
@@ -304,8 +313,11 @@ public class JobService {
         boolean isUnlocked = jobUnlockRepository.existsByJob_IdAndProvider_Id(jobId, provider.getId());
         boolean hasWonBid = bidService.isBidAccepted(jobId, provider.getId());
 
+        String activeTier = getActiveTierForProvider(provider.getId());
+
+        // UPDATE THIS BLOCK
         BidSummaryDto myBid = bidRepository.findByJobIdAndProviderId(jobId, provider.getId())
-                .map(bid -> BidSummaryDto.from(bid, false)) // false = don't reveal phone number
+                .map(bid -> BidSummaryDto.from(bid, false, activeTier))
                 .orElse(null);
 
         // 3. Distance Calculation Setup
@@ -385,7 +397,10 @@ public class JobService {
         n.setRead(false);
         notificationRepository.save(n);
 
-        return toDto(savedJob, true, true, true, BidSummaryDto.from(winningBid, true));
+        String activeTier = getActiveTierForProvider(provider.getId());
+
+        // UPDATE THE RETURN STATEMENT
+        return toDto(savedJob, true, true, true, BidSummaryDto.from(winningBid, true, activeTier));
     }
 
     @Transactional
@@ -418,7 +433,10 @@ public class JobService {
                         .orElseThrow(() -> new ResourceNotFoundException("No accepted bid found")))
                 .orElseThrow(() -> new ResourceNotFoundException("No accepted bid found"));
 
-        return toDto(savedJob, true, true, true, BidSummaryDto.from(winningBid, true));
+        String activeTier = getActiveTierForProvider(winningBid.getProvider().getId());
+
+        // UPDATE THE RETURN STATEMENT
+        return toDto(savedJob, true, true, true, BidSummaryDto.from(winningBid, true, activeTier));
     }
 
     private Job getJobAndValidateOwner(UUID userId, UUID jobId) {
@@ -472,5 +490,11 @@ public class JobService {
         ));
 
         return dto;
+    }
+
+    private String getActiveTierForProvider(UUID providerId) {
+        return providerCreditsRepository.findById(providerId)
+                .map(credits -> credits.getActiveTier() != null ? credits.getActiveTier().name() : "FREE")
+                .orElse("FREE");
     }
 }
