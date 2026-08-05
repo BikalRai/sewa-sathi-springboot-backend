@@ -449,6 +449,12 @@ public class JobService {
     }
 
     private JobResponseDto toDto(Job job, boolean showFullAddress, boolean showContact, boolean isUnLocked, BidSummaryDto myBid) {
+
+        // Fuzz the coordinates if the job is locked.
+        // Multiplying by 100.0, rounding, and dividing by 100.0 limits precision to 2 decimal places (roughly a 1.1km area).
+        Double displayLat = showFullAddress ? job.getLatitude() : Math.round(job.getLatitude() * 100.0) / 100.0;
+        Double displayLon = showFullAddress ? job.getLongitude() : Math.round(job.getLongitude() * 100.0) / 100.0;
+
         return JobResponseDto.builder()
                 .id(job.getId())
                 .description(job.getDescription())
@@ -458,8 +464,10 @@ public class JobService {
                 .status(job.getStatus())
                 .difficulty(job.getDifficulty())
                 .images(job.getImages() != null ? new java.util.ArrayList<>(job.getImages()) : new java.util.ArrayList<>())
-                .latitude(job.getLatitude())
-                .longitude(job.getLongitude())
+
+                // --- THE SECURE COORDINATES ---
+                .latitude(displayLat)
+                .longitude(displayLon)
 
                 // --- THE GATEKEEPER LOGIC ---
                 .address(showFullAddress ? job.getAddress() : job.getMaskedAddress())

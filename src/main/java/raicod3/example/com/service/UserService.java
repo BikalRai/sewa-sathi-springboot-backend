@@ -79,6 +79,10 @@ public class UserService {
             user.setUserAddress(address);
         }
 
+        if(!user.isOnboarded()) {
+            user.setOnboarded(true);
+        }
+
         User savedUser = userRepository.save(user);
         return new UserResponseDto(savedUser);
     }
