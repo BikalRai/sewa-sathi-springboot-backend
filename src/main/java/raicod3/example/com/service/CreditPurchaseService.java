@@ -36,6 +36,10 @@ public class CreditPurchaseService {
         ProviderProfile providerProfile = providerProfileRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider Profile Not Found"));
 
+        if(providerProfile.getIsVerified() == false) {
+            throw new  BadRequestException("Provider Profile Not Verified");
+        }
+
         ProviderCredits providerCredits = providerCreditsRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider Credits Not Found"));
 

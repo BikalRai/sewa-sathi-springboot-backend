@@ -70,6 +70,12 @@ khalti:
   return-url: http://localhost:5173/payment/verify
   website-url: http://localhost:5173
 
+esewa:
+  merchant-code: ${ESEWA_MERCHANT_CODE}
+  secret-key: ${ESEWA_SECRET_KEY}
+  gateway-url: ${ESEWA_GATEWAY_URL}
+  status-url: https://rc-epay.esewa.com.np/api/epay/transaction/status/
+
 logging:
   level:
     root: INFO
