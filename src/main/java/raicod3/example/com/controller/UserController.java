@@ -75,11 +75,11 @@ public class UserController {
     }
 
     @PatchMapping("/profile")
-    public ResponseEntity<UserResponseDto> updateProfile(
+    public ResponseEntity<APIResponse> updateProfile(
             @Valid @RequestBody UpdateCustomerProfileRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
 
         UserResponseDto updatedProfile = userService.updateCustomerProfile(userDetails.getId(), request);
-        return ResponseEntity.ok(updatedProfile);
+        return ResponseEntity.ok(APIResponse.success(updatedProfile, "User updated successfully", Http_Constants.OK));
     }
 }

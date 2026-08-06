@@ -1,5 +1,6 @@
 package raicod3.example.com.service;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -49,11 +50,17 @@ public class UserService {
         return new UserResponseDto(user);
     }
 
-
     @Transactional
     public UserResponseDto updateCustomerProfile(UUID userId, UpdateCustomerProfileRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Only check uniqueness if a phone number was actually provided,
+        // and exclude the current user's own row from the check.
+        if (request.getPhoneNumber() != null
+                && userRepository.existsByPhoneNumberAndIdNot(request.getPhoneNumber(), userId)) {
+            throw new DataIntegrityViolationException("Phone number already in use");
+        }
 
         // Safely update basic fields
         if (request.getFullName() != null) {
@@ -71,7 +78,7 @@ public class UserService {
             UserAddress address = user.getUserAddress();
             if (address == null) {
                 address = new UserAddress();
-                address.setUser(user); // Establish the bidirectional link
+                address.setUser(user);
             }
             address.setLatitude(request.getLatitude());
             address.setLongitude(request.getLongitude());
@@ -79,7 +86,7 @@ public class UserService {
             user.setUserAddress(address);
         }
 
-        if(!user.isOnboarded()) {
+        if (!user.isOnboarded()) {
             user.setOnboarded(true);
         }
 

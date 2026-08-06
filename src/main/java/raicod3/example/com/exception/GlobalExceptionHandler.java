@@ -45,14 +45,12 @@ public class GlobalExceptionHandler {
         ex.getBindingResult().getFieldErrors().forEach((error) -> errors.put(error.getField(), error.getDefaultMessage()));
 
         ErrorDetails errorDetails = new ErrorDetails("Validation error", errors.toString(), Http_Constants.BAD_REQUEST);
-
         return new ResponseEntity<>(errorDetails, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<?> handleForbiddenException(ForbiddenException ex) {
         ErrorDetails errorDetails = new ErrorDetails("Forbidden", ex.getMessage(), Http_Constants.FORBIDDEN);
-
         return new ResponseEntity<>(errorDetails, HttpStatus.FORBIDDEN);
     }
 
@@ -65,7 +63,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleGeneral(Exception ex) {
         ErrorDetails errorDetails = new ErrorDetails("Exception", ex.getMessage(), Http_Constants.INTERNAL_SERVER_ERROR);
-
         return new ResponseEntity<>(errorDetails, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
@@ -82,17 +79,8 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ErrorDetails> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
-        String message = "Something went wrong.";
-
-        if (ex.getMessage().contains("phone_number")) {
-            message = "This phone number is already in use.";
-        } else if (ex.getMessage().contains("email")) {
-            message = "This email is already registered.";
-        }
-
-        return ResponseEntity
-                .status(HttpStatus.CONFLICT)
-                .body(new ErrorDetails(message, message, Http_Constants.CONFLICT));
+    public ResponseEntity<?> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        ErrorDetails errorDetails = new ErrorDetails("Conflict", ex.getMessage(), Http_Constants.CONFLICT);
+        return new ResponseEntity<>(errorDetails, HttpStatus.CONFLICT);
     }
 }

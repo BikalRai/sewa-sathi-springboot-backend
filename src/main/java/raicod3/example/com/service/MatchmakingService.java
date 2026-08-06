@@ -30,7 +30,7 @@ public class MatchmakingService {
     private static final Double DEFAULT_RADIUS_KM = 5.0;
 
     @RabbitListener(queues = RabbitMQConfig.PROVIDER_MATCH_QUEUE)
-    @Transactional // Note: Removed readOnly=true because we are now saving Notifications to DB
+    @Transactional
     public void handleJobMatch(JobMatchEvent event) {
         log.info("Starting matchmaking for Job ID: {}", event.jobId());
 

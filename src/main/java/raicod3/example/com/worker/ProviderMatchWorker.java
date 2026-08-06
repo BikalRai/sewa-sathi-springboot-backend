@@ -11,10 +11,12 @@ import raicod3.example.com.lib.rabbitmq.RabbitMQProducer;
 import raicod3.example.com.model.Job;
 import raicod3.example.com.model.Notification;
 import raicod3.example.com.model.ProviderProfile;
+import raicod3.example.com.model.UserAddress;
 import raicod3.example.com.payload.ProviderMatchEvent;
 import raicod3.example.com.repository.JobRepository;
 import raicod3.example.com.repository.NotificationRepository;
 import raicod3.example.com.repository.ProviderProfileRepository;
+import raicod3.example.com.utilities.LocationUtils;
 
 import java.util.List;
 
@@ -28,20 +30,42 @@ public class ProviderMatchWorker {
     private final RabbitMQProducer rabbitMQProducer;
     private final JobRepository jobRepository;
 
+    private static final Double DEFAULT_RADIUS_KM = 5.0;
+
     @RabbitListener(queues = RabbitMQConfig.PROVIDER_MATCH_QUEUE)
     public void handle(ProviderMatchEvent event) {
         Job job = jobRepository.findByIdWithCategory(event.jobId())
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + event.jobId()));
+
+        if (job.getLatitude() == null || job.getLongitude() == null) {
+            log.error("Job {} lacks coordinates. Aborting match.", job.getId());
+            return;
+        }
 
         String normalizedCategory = event.category().trim().toLowerCase();
 
         List<ProviderProfile> matches = providerProfileRepository
                 .findByServiceIgnoreCase(normalizedCategory);
 
-        log.info("Found {} providers matching category '{}' for job {}",
-                matches.size(), event.category(), event.jobId());
+        // Filter to providers within DEFAULT_RADIUS_KM of the job
+        List<ProviderProfile> nearbyMatches = matches.stream()
+                .filter(provider -> {
+                    UserAddress addr = provider.getUser().getUserAddress();
+                    if (addr == null || addr.getLatitude() == null || addr.getLongitude() == null) {
+                        return false;
+                    }
+                    Double distance = LocationUtils.calculateDistance(
+                            job.getLatitude(), job.getLongitude(),
+                            addr.getLatitude(), addr.getLongitude()
+                    );
+                    return distance != null && distance <= DEFAULT_RADIUS_KM;
+                })
+                .toList();
 
-        for (ProviderProfile provider : matches) {
+        log.info("Found {} providers matching category '{}', {} within {}km for job {}",
+                matches.size(), event.category(), nearbyMatches.size(), DEFAULT_RADIUS_KM, event.jobId());
+
+        for (ProviderProfile provider : nearbyMatches) {
             try {
                 notifyOne(provider, job);
             } catch (Exception e) {
