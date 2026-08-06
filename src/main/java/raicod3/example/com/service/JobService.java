@@ -47,6 +47,8 @@ public class JobService {
     private final NotificationRepository notificationRepository;
     private final ProviderCreditsRepository providerCreditsRepository;
 
+    private static final Double DEFAULT_RADIUS_KM = 5.0;
+
     // Customer post a job
     @Transactional
     @Auditable(action = "CUSTOMER_POST_JOB")
@@ -147,7 +149,7 @@ public class JobService {
             return Collections.emptyList();
         }
 
-        // 1. Fetch matched jobs
+        // 1. Fetch matched jobs (status + category only — NOT distance-filtered yet)
         List<Job> matchedJobs = jobRepository.findByStatusAndCategoryNameInOrderByCreatedAtDesc(
                 JobStatus.OPEN,
                 provider.getServices()
@@ -157,52 +159,55 @@ public class JobService {
             return Collections.emptyList();
         }
 
-        // --- THE BATCH FETCHING LOGIC ---
+        // --- EXTRACT PROVIDER BASE COORDINATES (moved up, needed for the filter step) ---
+        UserAddress providerAddress = provider.getUser().getUserAddress();
+        Double providerLat = providerAddress != null ? providerAddress.getLatitude() : null;
+        Double providerLon = providerAddress != null ? providerAddress.getLongitude() : null;
 
-        // Extract all Job IDs from the matched jobs
+        // --- APPLY THE 5KM RADIUS FILTER ---
+        // If the provider has no address set, we can't compute distance — decide the policy:
+        // here we choose to show them nothing distance-gated, matching the fallback below.
+        if (providerLat != null && providerLon != null) {
+            matchedJobs = matchedJobs.stream()
+                    .filter(job -> {
+                        Double distance = LocationUtils.calculateDistance(
+                                providerLat, providerLon,
+                                job.getLatitude(), job.getLongitude()
+                        );
+                        return distance != null && distance <= DEFAULT_RADIUS_KM;
+                    })
+                    .toList();
+        }
+
+        if (matchedJobs.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // --- THE BATCH FETCHING LOGIC (unchanged, now operating on the filtered list) ---
         List<UUID> jobIds = matchedJobs.stream().map(Job::getId).toList();
 
-        // Batch fetch Unlocks and convert to a Set for O(1) lookups
         Set<UUID> unlockedJobIds = jobUnlockRepository.findByProviderIdAndJobIdIn(provider.getId(), jobIds)
                 .stream()
                 .map(unlock -> unlock.getJob().getId())
                 .collect(Collectors.toSet());
 
-        // Batch fetch Bids and convert to a Map (JobId -> Bid) for O(1) lookups
         Map<UUID, Bid> providerBidsMap = bidRepository.findByProviderIdAndJobIdIn(provider.getId(), jobIds)
                 .stream()
                 .collect(Collectors.toMap(bid -> bid.getJob().getId(), bid -> bid));
 
-        // --- EXTRACT PROVIDER BASE COORDINATES ---
-        UserAddress providerAddress = provider.getUser().getUserAddress();
-        Double providerLat = providerAddress != null ? providerAddress.getLatitude() : null;
-        Double providerLon = providerAddress != null ? providerAddress.getLongitude() : null;
-
-        // 2. Map to DTO in memory
         String activeTier = getActiveTierForProvider(provider.getId());
 
-        // Update the mapping logic inside the stream:
         return matchedJobs.stream().map(job -> {
             boolean isUnlocked = unlockedJobIds.contains(job.getId());
             Bid myBid = providerBidsMap.get(job.getId());
-
-            // UPDATE THIS LINE (pass activeTier)
             BidSummaryDto bidSummary = myBid != null ? BidSummaryDto.from(myBid, false, activeTier) : null;
 
             if (providerLat == null || providerLon == null) {
-                // Fallback if provider has no address
                 return toDto(job, isUnlocked, false, isUnlocked, bidSummary);
             }
 
-            // Return with dynamically calculated distance and correct UI state flags
             return toDtoWithDistance(
-                    job,
-                    isUnlocked, // includeAddress (show real address if unlocked)
-                    false,      // includeContact (keep hidden in list view)
-                    isUnlocked, // isUnlocked
-                    bidSummary, // myBid
-                    providerLat,
-                    providerLon
+                    job, isUnlocked, false, isUnlocked, bidSummary, providerLat, providerLon
             );
         }).toList();
     }

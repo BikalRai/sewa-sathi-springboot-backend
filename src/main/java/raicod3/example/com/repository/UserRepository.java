@@ -17,7 +17,7 @@
 
         Optional<User> findUserByEmail(String email);
 
-        Optional<User> findUserByEmailAndPassword(String email, String password);
+        boolean existsUserByPhoneNumber(String phone);
 
         Optional<User> findByProviderId(String sub);
 
@@ -26,4 +26,6 @@
         Page<User> findAll(Pageable pageable);
 
         boolean existsByRole(UserRole role);
+
+        boolean existsByPhoneNumberAndIdNot(String phoneNumber, UUID userId);
     }
